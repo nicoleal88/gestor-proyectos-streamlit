@@ -1,0 +1,6 @@
+
+# Google Cloud credentials
+credenciales.json
+
+# Virtual environment
+/venv

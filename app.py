@@ -168,7 +168,7 @@ def seccion_tareas(client, personal_list):
 
         st.dataframe(df_display.style.apply(highlight_overdue, axis=1),
                      column_order=("ID", "Título Tarea", "Responsable", "Fecha límite", "Estado"),
-                     use_container_width=True,
+                     width='stretch',
                      hide_index=True,
                      column_config={
                          'Fecha límite': st.column_config.DateColumn(format="DD/MM/YYYY")
@@ -202,10 +202,15 @@ def seccion_tareas(client, personal_list):
     # --- 3. DETALLES, COMENTARIOS Y MODIFICACIÓN ---
     st.markdown("### 🔍 Ver Detalles, Comentarios y Modificar Tarea")
     if not df_filtered.empty:
-        ids = df_filtered["ID"].astype(str).tolist()
-        id_to_show = st.selectbox("Selecciona ID de la tarea para ver detalles", options=[""] + ids, key="view_select")
+        # Crear lista de opciones con ID y Título
+        task_options = [f"{row['ID']} - {row['Título Tarea']}" for _, row in df_filtered.iterrows()]
 
-        if id_to_show:
+        option_to_show = st.selectbox("Selecciona una tarea para ver detalles", options=[""] + task_options, key="view_select")
+
+        if option_to_show:
+            # Extraer el ID de la opción seleccionada
+            id_to_show = option_to_show.split(' - ')[0]
+
             task_data = df_filtered[df_filtered["ID"] == int(id_to_show)].iloc[0]
             comments_df = get_comments_for_task(client, id_to_show)
 
@@ -228,7 +233,7 @@ def seccion_tareas(client, personal_list):
 
                 st.markdown("#### Historial de Avances y Comentarios")
                 if not comments_df.empty:
-                    st.dataframe(comments_df, use_container_width=True, hide_index=True,
+                    st.dataframe(comments_df, width='stretch', hide_index=True,
                                  column_config={
                                      'Fecha': st.column_config.DateColumn(format="DD/MM/YYYY")
                                  })
@@ -290,7 +295,7 @@ def seccion_vacaciones(client, personal_list):
     if sheet is None: return
 
     df = get_all_records(sheet)
-    st.dataframe(df, use_container_width=True, hide_index=True,
+    st.dataframe(df, width='stretch', hide_index=True,
                  column_config={
                      'Fecha solicitud': st.column_config.DateColumn(format="DD/MM/YYYY"),
                      'Fecha inicio': st.column_config.DateColumn(format="DD/MM/YYYY"),
@@ -302,10 +307,12 @@ def seccion_vacaciones(client, personal_list):
     # --- AGREGAR NUEVO REGISTRO ---
     with st.expander("➕ Agregar Nuevo Registro de Licencia/Vacaciones"):
         with st.form("nueva_vacacion_form", clear_on_submit=True):
+            tipo_options = ["Licencia Ordinaria 2024", "Licencia Ordinaria 2025"]
             personal_options = ["Seleccione persona..."] + personal_list
+
             nombre = st.selectbox("Apellido, Nombres", options=personal_options, key="add_vac_nombre", index=0)
             fecha_solicitud = st.date_input("Fecha de Solicitud", value=datetime.now())
-            tipo = st.text_input("Tipo (Ej: Licencia Ordinaria 2024)")
+            tipo = st.selectbox("Tipo", options=tipo_options, index=0)
             fecha_inicio = st.date_input("Fecha de Inicio")
             fecha_fin = st.date_input("Fecha de Fin")
             observaciones = st.text_area("Observaciones")
@@ -344,14 +351,21 @@ def seccion_vacaciones(client, personal_list):
                 st.write(f"**Modificando Registro de la Fila: {row_number_to_edit}**")
 
                 personal_options = ["Seleccione persona..."] + personal_list
+                tipo_options = ["Licencia Ordinaria 2024", "Licencia Ordinaria 2025"]
+
                 try:
                     default_nombre_idx = personal_options.index(record_data["Apellido, Nombres"])
                 except ValueError:
                     default_nombre_idx = 0
 
+                try:
+                    default_tipo_idx = tipo_options.index(record_data["Tipo"])
+                except ValueError:
+                    default_tipo_idx = 0
+
                 nombre = st.selectbox("Apellido, Nombres", options=personal_options, index=default_nombre_idx)
                 fecha_solicitud = st.date_input("Fecha de Solicitud", value=pd.to_datetime(record_data["Fecha solicitud"]))
-                tipo = st.text_input("Tipo", value=record_data["Tipo"])
+                tipo = st.selectbox("Tipo", options=tipo_options, index=default_tipo_idx)
                 fecha_inicio = st.date_input("Fecha de Inicio", value=pd.to_datetime(record_data["Fecha inicio"]))
                 fecha_fin = st.date_input("Fecha de Fin", value=pd.to_datetime(record_data["Fecha fin"]))
                 observaciones = st.text_area("Observaciones", value=record_data["Observaciones"])
@@ -391,6 +405,11 @@ def seccion_notas(client, personal_list):
 
     # --- VISTA GENERAL DE NOTAS ---
     if not df.empty:
+        # Forzar columnas a string para evitar errores de tipo en Arrow
+        for col in ['DNI', 'Teléfono']:
+            if col in df.columns:
+                df[col] = df[col].astype(str).replace('nan', '')
+
         def style_estado(estado):
             if estado == 'Realizado':
                 return 'color: green'
@@ -400,8 +419,8 @@ def seccion_notas(client, personal_list):
                 return 'color: orange'
             return ''
 
-        st.dataframe(df.style.applymap(style_estado, subset=['Estado']),
-                     use_container_width=True,
+        st.dataframe(df.style.map(style_estado, subset=['Estado']),
+                     width='stretch',
                      hide_index=True,
                      column_config={
                          'Fecha': st.column_config.DateColumn(format="DD/MM/YYYY")
@@ -466,8 +485,8 @@ def seccion_notas(client, personal_list):
 
                 fecha = st.date_input("Fecha", value=pd.to_datetime(record_data["Fecha"]))
                 remitente = st.text_area("Remitente(s)", value=record_data["Remitente"])
-                dni = st.text_input("DNI(s)", value=record_data.get("DNI", ""))
-                telefono = st.text_input("Teléfono(s)", value=record_data.get("Teléfono", ""))
+                dni = st.text_input("DNI(s)", value=str(record_data.get("DNI", "")))
+                telefono = st.text_input("Teléfono(s)", value=str(record_data.get("Teléfono", "")))
                 motivo = st.text_area("Motivo", value=record_data["Motivo"])
                 responsable = st.selectbox("Responsable", options=personal_options, index=default_resp_idx)
                 estado = st.selectbox("Estado", options=estados_options, index=default_estado_idx)
@@ -498,6 +517,7 @@ def seccion_recordatorios(client, personal_list):
 
     df = get_all_records(sheet)
     st.dataframe(df, hide_index=True,
+                 width='content',
                  column_config={
                      'Fecha': st.column_config.DateColumn(format="DD/MM/YYYY")
                  })
@@ -540,7 +560,7 @@ def seccion_compensados(client, personal_list):
     if sheet is None: return
 
     df = get_all_records(sheet)
-    st.dataframe(df, use_container_width=True, hide_index=True,
+    st.dataframe(df, width='stretch', hide_index=True,
                  column_config={
                      'Fecha Solicitud': st.column_config.DateColumn(format="DD/MM/YYYY"),
                      'Desde fecha': st.column_config.DateColumn(format="DD/MM/YYYY"),
@@ -553,9 +573,11 @@ def seccion_compensados(client, personal_list):
             st.write("**Agregar nuevo registro**")
 
             personal_options = ["Seleccione persona..."] + personal_list
+            tipo_options = ["Compensatorio"]
+
             nombre = st.selectbox("Apellido, Nombre", options=personal_options, index=0)
             fecha_solicitud = st.date_input("Fecha Solicitud", value=datetime.now())
-            tipo = st.text_input("Tipo", value="Compensatorio")
+            tipo = st.selectbox("Tipo", options=tipo_options, index=0)
 
             col1, col2 = st.columns(2)
             desde_fecha = col1.date_input("Desde fecha")
