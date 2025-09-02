@@ -2,8 +2,9 @@ import streamlit as st
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, timedelta
 from streamlit_option_menu import option_menu
+from streamlit_calendar import calendar
 
 # --- CONFIGURACIÓN DE GOOGLE SHEETS ---
 @st.cache_resource
@@ -49,6 +50,18 @@ def get_personal_list(_client):
             st.error(f"No se pudo leer la lista de personal: {e}")
             return []
     return []
+
+@st.cache_data(ttl=600)
+def get_cached_sheet_data(_client, sheet_name):
+    '''Fetches all records from a sheet and caches the result.'''
+    sheet = get_sheet(_client, sheet_name)
+    if sheet is None:
+        return pd.DataFrame()
+    try:
+        return pd.DataFrame(sheet.get_all_records())
+    except Exception as e:
+        st.error(f"Error al leer los registros de la hoja '{sheet_name}': {e}")
+        return pd.DataFrame()
 
 def get_all_records(sheet):
     if sheet is None:
@@ -100,12 +113,7 @@ def generar_reporte_markdown(task_data, comments_df):
 
 
 def get_comments_for_task(client, task_id):
-
-
-    comments_sheet = get_sheet(client, "Comentarios")
-    if comments_sheet is None: return pd.DataFrame()
-
-    all_comments = get_all_records(comments_sheet)
+    all_comments = get_cached_sheet_data(client, "Comentarios")
     if all_comments.empty:
         return pd.DataFrame()
 
@@ -121,15 +129,16 @@ def add_comment_to_task(client, task_id, comment_text, comment_date):
     # Usar la fecha provista y formatearla como string
     fecha_str = comment_date.strftime("%Y-%m-%d")
     comments_sheet.append_row([task_id, fecha_str, comment_text])
+    st.cache_data.clear()
     return True
 
 # --- SECCIÓN DE TAREAS (REFACTORIZADA) ---
 def seccion_tareas(client, personal_list):
     st.subheader("📋 Gestión de Tareas")
-    sheet = get_sheet(client, "Tareas")
-    if sheet is None: return
+    df_tasks = get_cached_sheet_data(client, "Tareas")
+    sheet = get_sheet(client, "Tareas") # Necesario para escribir
 
-    df_tasks = get_all_records(sheet)
+    if sheet is None: return
 
     # --- MÉTRICAS ---
     if not df_tasks.empty:
@@ -199,6 +208,7 @@ def seccion_tareas(client, personal_list):
                 else:
                     new_id = (max(df_tasks['ID'].astype(int)) + 1) if not df_tasks.empty else 1
                     sheet.append_row([new_id, titulo_tarea, tarea, responsable, fecha_limite.strftime('%Y-%m-%d'), estado])
+                    st.cache_data.clear()
                     st.success(f"¡Tarea ID {new_id} agregada!")
                     st.rerun()
 
@@ -279,11 +289,13 @@ def seccion_tareas(client, personal_list):
                                 sheet.update_cell(task_data.name + 2, 4, responsable)
                                 sheet.update_cell(task_data.name + 2, 5, fecha_limite.strftime('%Y-%m-%d'))
                                 sheet.update_cell(task_data.name + 2, 6, estado)
+                                st.cache_data.clear()
                                 st.success("¡Tarea actualizada!")
                                 st.rerun()
 
                         if col_del.form_submit_button("Eliminar Tarea"):
                             sheet.delete_rows(task_data.name + 2)
+                            st.cache_data.clear()
                             st.success("¡Tarea eliminada!")
                             st.rerun()
         else:
@@ -292,10 +304,9 @@ def seccion_tareas(client, personal_list):
 # --- OTRAS SECCIONES (SIN CAMBIOS) ---
 def seccion_vacaciones(client, personal_list):
     st.subheader("📅 Registro de Licencias y Vacaciones")
-    sheet = get_sheet(client, "Vacaciones")
+    df = get_cached_sheet_data(client, "Vacaciones")
+    sheet = get_sheet(client, "Vacaciones") # Necesario para escribir
     if sheet is None: return
-
-    df = get_all_records(sheet)
 
     # --- MÉTRICAS ---
     if not df.empty:
@@ -346,6 +357,7 @@ def seccion_vacaciones(client, personal_list):
                 else:
                     new_row = [nombre, fecha_solicitud.strftime('%Y-%m-%d'), tipo, fecha_inicio.strftime('%Y-%m-%d'), fecha_fin.strftime('%Y-%m-%d'), observaciones]
                     sheet.append_row(new_row)
+                    st.cache_data.clear()
                     st.success("Registro agregado exitosamente.")
                     st.rerun()
 
@@ -386,11 +398,13 @@ def seccion_vacaciones(client, personal_list):
                         else:
                             update_values = [nombre, fecha_solicitud.strftime('%Y-%m-%d'), tipo, fecha_inicio.strftime('%Y-%m-%d'), fecha_fin.strftime('%Y-%m-%d'), observaciones]
                             sheet.update(f'A{row_number_to_edit}:F{row_number_to_edit}', [update_values])
+                            st.cache_data.clear()
                             st.success("¡Registro actualizado!")
                             st.rerun()
 
                     if col_del.form_submit_button("Eliminar Registro"):
                         sheet.delete_rows(row_number_to_edit)
+                        st.cache_data.clear()
                         st.success("¡Registro eliminado!")
                         st.rerun()
         else:
@@ -398,10 +412,9 @@ def seccion_vacaciones(client, personal_list):
 
 def seccion_notas(client, personal_list):
     st.subheader("📝 Registro de Notas y Solicitudes")
-    sheet = get_sheet(client, "Notas")
+    df = get_cached_sheet_data(client, "Notas")
+    sheet = get_sheet(client, "Notas") # Necesario para escribir
     if sheet is None: return
-
-    df = get_all_records(sheet)
 
     # --- MÉTRICAS ---
     if not df.empty:
@@ -466,6 +479,7 @@ def seccion_notas(client, personal_list):
                 else:
                     new_row = [fecha.strftime('%Y-%m-%d'), remitente, dni, telefono, motivo, responsable, estado]
                     sheet.append_row(new_row)
+                    st.cache_data.clear()
                     st.success("Nota/Solicitud agregada exitosamente.")
                     st.rerun()
 
@@ -500,10 +514,12 @@ def seccion_notas(client, personal_list):
                         else:
                             update_values = [fecha.strftime('%Y-%m-%d'), remitente, dni, telefono, motivo, responsable, estado]
                             sheet.update(f'A{row_number_to_edit}:G{row_number_to_edit}', [update_values])
+                            st.cache_data.clear()
                             st.success("¡Registro actualizado!")
                             st.rerun()
                     if col_del.form_submit_button("Eliminar Registro"):
                         sheet.delete_rows(row_number_to_edit)
+                        st.cache_data.clear()
                         st.success("¡Registro eliminado!")
                         st.rerun()
         else:
@@ -511,10 +527,9 @@ def seccion_notas(client, personal_list):
 
 def seccion_recordatorios(client, personal_list):
     st.subheader("🔔 Recordatorios Importantes")
-    sheet = get_sheet(client, "Recordatorios")
+    df = get_cached_sheet_data(client, "Recordatorios")
+    sheet = get_sheet(client, "Recordatorios") # Necesario para escribir
     if sheet is None: return
-
-    df = get_all_records(sheet)
 
     # --- MÉTRICAS ---
     st.metric("Total de Recordatorios", len(df))
@@ -544,6 +559,7 @@ def seccion_recordatorios(client, personal_list):
                     st.warning("Todos los campos son obligatorios.")
                 else:
                     sheet.append_row([fecha.strftime('%Y-%m-%d'), mensaje, responsable])
+                    st.cache_data.clear()
                     st.success("Recordatorio agregado.")
                     st.rerun()
 
@@ -559,6 +575,7 @@ def seccion_recordatorios(client, personal_list):
                 if row_to_delete_display:
                     row_index = int(row_to_delete_display.split(':')[0].replace('Fila ', ''))
                     sheet.delete_rows(row_index)
+                    st.cache_data.clear()
                     st.success("Recordatorio eliminado.")
                     st.rerun()
                 else:
@@ -566,10 +583,9 @@ def seccion_recordatorios(client, personal_list):
 
 def seccion_compensados(client, personal_list):
     st.subheader("⏱️ Registro de Compensatorios")
-    sheet = get_sheet(client, "Compensados")
+    df = get_cached_sheet_data(client, "Compensados")
+    sheet = get_sheet(client, "Compensados") # Necesario para escribir
     if sheet is None: return
-
-    df = get_all_records(sheet)
 
     # --- MÉTRICAS ---
     st.metric("Total de Registros", len(df))
@@ -611,6 +627,7 @@ def seccion_compensados(client, personal_list):
                 else:
                     new_row = [nombre, fecha_solicitud.strftime('%Y-%m-%d'), tipo, desde_fecha.strftime('%Y-%m-%d'), desde_hora.strftime('%H:%M'), hasta_fecha.strftime('%Y-%m-%d'), hasta_hora.strftime('%H:%M')]
                     sheet.append_row(new_row)
+                    st.cache_data.clear()
                     st.success("Registro de compensatorio agregado.")
                     st.rerun()
 
@@ -627,10 +644,70 @@ def seccion_compensados(client, personal_list):
                 if row_to_delete_display:
                     row_index = int(row_to_delete_display.split(':')[0].replace('Fila ', ''))
                     sheet.delete_rows(row_index)
+                    st.cache_data.clear()
                     st.success("Registro eliminado.")
                     st.rerun()
                 else:
                     st.warning("Por favor, selecciona un registro para eliminar.")
+
+def seccion_calendario(client):
+    st.subheader("🗓️ Calendario Unificado")
+
+    calendar_options = {
+        "headerToolbar": {
+            "left": "prev,next today",
+            "center": "title",
+            "right": "dayGridMonth,timeGridWeek,timeGridDay",
+        },
+        "initialView": "dayGridMonth",
+        "editable": False,
+        "selectable": True,
+    }
+
+    calendar_events = []
+
+    # Cargar Tareas
+    df_tasks = get_cached_sheet_data(client, "Tareas")
+    if not df_tasks.empty:
+        df_tasks['Fecha límite'] = pd.to_datetime(df_tasks['Fecha límite'], errors='coerce')
+        for _, row in df_tasks.iterrows():
+            if pd.notna(row['Fecha límite']):
+                calendar_events.append({
+                    "title": f"Tarea: {row['Título Tarea']}",
+                    "start": row['Fecha límite'].strftime('%Y-%m-%d'),
+                    "end": row['Fecha límite'].strftime('%Y-%m-%d'),
+                    "color": "#FF6347",  # Rojo Tomate
+                })
+
+    # Cargar Vacaciones
+    df_vacations = get_cached_sheet_data(client, "Vacaciones")
+    if not df_vacations.empty:
+        df_vacations['Fecha inicio'] = pd.to_datetime(df_vacations['Fecha inicio'], errors='coerce')
+        df_vacations['Fecha fin'] = pd.to_datetime(df_vacations['Fecha fin'], errors='coerce')
+        for _, row in df_vacations.iterrows():
+            if pd.notna(row['Fecha inicio']) and pd.notna(row['Fecha fin']):
+                calendar_events.append({
+                    "title": f"Licencia: {row['Apellido, Nombres']}",
+                    "start": row['Fecha inicio'].strftime('%Y-%m-%d'),
+                    "end": (row['Fecha fin'] + pd.Timedelta(days=1)).strftime('%Y-%m-%d'), # +1 para incluir el día final
+                    "color": "#1E90FF",  # Azul Dodger
+                })
+
+    # Cargar Compensatorios
+    df_compensados = get_cached_sheet_data(client, "Compensados")
+    if not df_compensados.empty:
+        df_compensados['Desde fecha'] = pd.to_datetime(df_compensados['Desde fecha'], errors='coerce')
+        df_compensados['Hasta fecha'] = pd.to_datetime(df_compensados['Hasta fecha'], errors='coerce')
+        for _, row in df_compensados.iterrows():
+            if pd.notna(row['Desde fecha']) and pd.notna(row['Hasta fecha']):
+                calendar_events.append({
+                    "title": f"Compensatorio: {row['Apellido, Nombre']}",
+                    "start": row['Desde fecha'].strftime('%Y-%m-%d'),
+                    "end": (row['Hasta fecha'] + pd.Timedelta(days=1)).strftime('%Y-%m-%d'), # +1 para incluir el día final
+                    "color": "#32CD32", # Verde Lima
+                })
+
+    calendar(events=calendar_events, options=calendar_options)
 
 
 # --- APP PRINCIPAL ---
@@ -656,8 +733,8 @@ def main():
         with st.sidebar:
             seccion = option_menu(
                 "Menú Principal",
-                ["Tareas", "Vacaciones", "Compensados", "Notas", "Recordatorios"],
-                icons=['list-check', 'calendar-check', 'clock-history', 'sticky', 'bell'],
+                ["Tareas", "Vacaciones", "Compensados", "Notas", "Recordatorios", "Calendario"],
+                icons=['list-check', 'calendar-check', 'clock-history', 'sticky', 'bell', 'calendar'],
                 menu_icon="cast",
                 default_index=0
             )
@@ -675,6 +752,8 @@ def main():
             seccion_notas(client, personal_list)
         elif seccion == "Recordatorios":
             seccion_recordatorios(client, personal_list)
+        elif seccion == "Calendario":
+            seccion_calendario(client)
 
 if __name__ == "__main__":
     main()
