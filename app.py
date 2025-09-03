@@ -1,6 +1,5 @@
 import streamlit as st
 import gspread
-from oauth2client.service_account import ServiceAccountCredentials
 import pandas as pd
 from datetime import datetime, timedelta
 from streamlit_option_menu import option_menu
@@ -10,9 +9,7 @@ from streamlit_calendar import calendar
 @st.cache_resource
 def connect_to_google_sheets():
     try:
-        scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-        creds = ServiceAccountCredentials.from_json_keyfile_name("credenciales.json", scope)
-        client = gspread.authorize(creds)
+        client = gspread.service_account("credenciales.json")
         return client
     except FileNotFoundError:
         st.error("Error: El archivo 'credenciales.json' no se encontró.")
@@ -109,6 +106,7 @@ def generar_reporte_markdown(task_data, comments_df):
         reporte += "\n_No hay avances registrados para esta tarea._"
 
     return reporte
+
 
 
 
@@ -706,6 +704,44 @@ def seccion_calendario(client):
                     "end": (row['Hasta fecha'] + pd.Timedelta(days=1)).strftime('%Y-%m-%d'), # +1 para incluir el día final
                     "color": "#32CD32", # Verde Lima
                 })
+
+    # Cargar Recordatorios
+    df_reminders = get_cached_sheet_data(client, "Recordatorios")
+    if not df_reminders.empty:
+        df_reminders['Fecha'] = pd.to_datetime(df_reminders['Fecha'], errors='coerce')
+        for _, row in df_reminders.iterrows():
+            if pd.notna(row['Fecha']):
+                calendar_events.append({
+                    "title": f"Recordatorio: {row['Mensaje']}",
+                    "start": row['Fecha'].strftime('%Y-%m-%d'),
+                    "end": row['Fecha'].strftime('%Y-%m-%d'),
+                    "color": "#8A2BE2",  # BlueViolet
+                })
+
+    # Cargar Cumpleaños
+    df_personal = get_cached_sheet_data(client, "Personal")
+    if not df_personal.empty and 'Fecha de nacimiento' in df_personal.columns:
+        df_personal['Fecha de nacimiento'] = pd.to_datetime(df_personal['Fecha de nacimiento'], errors='coerce', dayfirst=True)
+        today = datetime.now()
+        for _, row in df_personal.iterrows():
+            if pd.notna(row['Fecha de nacimiento']):
+                # Crear evento para el año actual
+                cumple_actual = row['Fecha de nacimiento'].replace(year=today.year)
+                calendar_events.append({
+                    "title": f"🎂 Cumpleaños: {row['Apellido, Nombres']}",
+                    "start": cumple_actual.strftime('%Y-%m-%d'),
+                    "end": cumple_actual.strftime('%Y-%m-%d'),
+                    "color": "#FFD700", # Oro
+                })
+                # Opcional: Crear también para el próximo año para no perderlo si estamos a fin de año
+                if today.month == 12:
+                    cumple_proximo = row['Fecha de nacimiento'].replace(year=today.year + 1)
+                    calendar_events.append({
+                        "title": f"🎂 Cumpleaños: {row['Apellido, Nombres']}",
+                        "start": cumple_proximo.strftime('%Y-%m-%d'),
+                        "end": cumple_proximo.strftime('%Y-%m-%d'),
+                        "color": "#FFD700", # Oro
+                    })
 
     calendar(events=calendar_events, options=calendar_options)
 
