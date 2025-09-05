@@ -84,6 +84,14 @@ def seccion_tareas(client, personal_list):
 
     with vista_general:
         if not df_tasks.empty:
+            def style_estado(estado):
+                if estado == 'Finalizada':
+                    return 'color: green'
+                elif estado == 'En curso':
+                    return 'color: blue'
+                elif estado == 'Pendiente':
+                    return 'color: orange'
+                return ''
             col1, col2 = st.columns(2)
             status_options = df_tasks['Estado'].unique().tolist()
             responsable_options = df_tasks['Responsable'].unique().tolist()
@@ -103,7 +111,7 @@ def seccion_tareas(client, personal_list):
                 lambda row: f"🚨 {row['Título Tarea']}" if pd.notna(row['Fecha límite']) and row['Fecha límite'].date() < today and row['Estado'] != 'Finalizada' else row['Título Tarea'],
                 axis=1
             )
-            st.dataframe(df_display.style.apply(highlight_overdue, axis=1), width='stretch', hide_index=True,
+            st.dataframe(df_display.style.apply(highlight_overdue, axis=1).map(style_estado, subset=['Estado']), width='stretch', hide_index=True,
                          column_config={'Fecha límite': st.column_config.DateColumn(format="DD/MM/YYYY")})
         else:
             st.info("No hay tareas registradas.")

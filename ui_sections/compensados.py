@@ -36,7 +36,31 @@ def seccion_compensados(client, personal_list):
         df_display = df_compensados.copy()
         if 'row_number' in df_display.columns:
             df_display = df_display.drop(columns=['row_number'])
-        st.dataframe(df_display, width='stretch', hide_index=True)
+        df_display = df_display.sort_values(by='Desde fecha', ascending=False)
+
+        def style_status(row):
+            today = pd.to_datetime(datetime.now().date()).date()
+            start_date = pd.to_datetime(row['Desde fecha']).date()
+            end_date = pd.to_datetime(row['Hasta fecha']).date()
+            style = ''
+            if start_date <= today and end_date >= today:
+                style = 'background-color: lightblue'  # En curso (blue)
+            elif end_date < today:
+                style = 'background-color: lightgray'  # Ya ocurridas (gray)
+            elif start_date > today:
+                style = 'background-color: orange'  # Próximas (orange)
+            return [style] * len(row)
+
+        st.dataframe(
+            df_display.style.apply(style_status, axis=1),
+            width='stretch',
+            hide_index=True,
+            column_config={
+                'Desde fecha': st.column_config.DateColumn(format="DD/MM/YYYY"),
+                'Hasta fecha': st.column_config.DateColumn(format="DD/MM/YYYY"),
+                'Fecha Solicitud': st.column_config.DateColumn(format="DD/MM/YYYY")
+            }
+        )
 
     with agregar_compensatorio:
         tipo_compensatorio = st.radio("Tipo de compensatorio", ("Día completo", "Por horas"), key="tipo_compensatorio_radio")

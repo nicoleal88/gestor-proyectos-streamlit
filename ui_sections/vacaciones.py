@@ -31,7 +31,31 @@ def seccion_vacaciones(client, personal_list):
     vista_general, nueva_licencia, modificar_licencia = st.tabs(["📊 Vista General", "➕ Nueva Licencia", "✏️ Modificar / Eliminar"])
 
     with vista_general:
-        st.dataframe(df_vacaciones, width='stretch', hide_index=True)
+        df_display = df_vacaciones.sort_values(by='Fecha inicio', ascending=False)
+
+        def style_status(row):
+            today = pd.to_datetime(datetime.now().date()).date()
+            start_date = pd.to_datetime(row['Fecha inicio']).date()
+            end_date = pd.to_datetime(row['Fecha fin']).date()
+            style = ''
+            if start_date <= today and end_date >= today:
+                style = 'background-color: lightblue'  # En curso (blue)
+            elif end_date < today:
+                style = 'background-color: lightgray'  # Ya ocurridas (gray)
+            elif start_date > today:
+                style = 'background-color: orange'  # Próximas (orange)
+            return [style] * len(row)
+
+        st.dataframe(
+            df_display.style.apply(style_status, axis=1),
+            width='stretch',
+            hide_index=True,
+            column_config={
+                'Fecha inicio': st.column_config.DateColumn(format="DD/MM/YYYY"),
+                'Fecha fin': st.column_config.DateColumn(format="DD/MM/YYYY"),
+                'Fecha solicitud': st.column_config.DateColumn(format="DD/MM/YYYY")
+            }
+        )
 
     with nueva_licencia:
         with st.form("nueva_vacacion_form", clear_on_submit=True):
