@@ -32,6 +32,8 @@ def seccion_vacaciones(client, personal_list):
 
     with vista_general:
         df_display = df_vacaciones.sort_values(by='Fecha inicio', ascending=False)
+        if 'row_number' in df_display.columns:
+            df_display = df_display.drop(columns=['row_number'])
 
         def style_status(row):
             today = pd.to_datetime(datetime.now().date()).date()
@@ -64,7 +66,7 @@ def seccion_vacaciones(client, personal_list):
             tipo = st.selectbox("Tipo", options=["Licencia Ordinaria 2024", "Licencia Ordinaria 2025"])
             fecha_inicio = st.date_input("Fecha de Inicio")
             fecha_fin = st.date_input("Fecha de Fin")
-            observaciones = st.text_area("Observaciones")
+            observaciones = st.text_area("Observaciones", value="Pendientes: ")
 
             if st.form_submit_button("Agregar Registro"):
                 if nombre == "Seleccione persona...":
