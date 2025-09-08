@@ -121,7 +121,7 @@ def seccion_tareas(client, personal_list):
             titulo_tarea = st.text_input("Título Tarea")
             tarea = st.text_area("Descripción Completa de la Tarea")
             responsable = st.selectbox("Responsable", options=["Seleccione persona..."] + personal_list)
-            fecha_limite = st.date_input("Fecha límite")
+            fecha_limite = st.date_input("Fecha límite", value=None)
             estado = st.selectbox("Estado", ["Pendiente", "En curso", "Finalizada"])
 
             if st.form_submit_button("Agregar Tarea"):
@@ -129,7 +129,8 @@ def seccion_tareas(client, personal_list):
                     st.warning("Por favor, complete todos los campos obligatorios.")
                 else:
                     new_id = (max(df_tasks['ID'].astype(int)) + 1) if not df_tasks.empty else 1
-                    new_row = [new_id, titulo_tarea, tarea, responsable, fecha_limite.strftime('%Y-%m-%d'), estado]
+                    fecha_limite_str = fecha_limite.strftime('%Y-%m-%d') if fecha_limite else ""
+                    new_row = [new_id, titulo_tarea, tarea, responsable, fecha_limite_str, estado]
                     sheet.append_row(new_row)
                     refresh_data(client, sheet_name)
                     st.success(f"¡Tarea ID {new_id} agregada!")
