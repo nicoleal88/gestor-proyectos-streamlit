@@ -7,6 +7,7 @@ from ui_sections.compensados import seccion_compensados
 from ui_sections.notas import seccion_notas
 from ui_sections.recordatorios import seccion_recordatorios
 from ui_sections.calendario import seccion_calendario
+from ui_sections.horarios import seccion_horarios
 
 # --- FUNCIONES AUXILIARES ---
 def get_personal_list():
@@ -17,7 +18,7 @@ def get_personal_list():
 # --- APP PRINCIPAL ---
 def main():
     st.set_page_config(page_title="Gestor de Proyectos", layout="wide")
-    st.markdown("<h1 style='text-align:center'>📊 Gestor de Proyectos</h1>", unsafe_allow_html=True)
+    # st.markdown("<h1 style='text-align:center'>📊 Gestor de Proyectos</h1>", unsafe_allow_html=True)
 
     client = connect_to_google_sheets()
 
@@ -28,14 +29,14 @@ def main():
         with st.sidebar:
             seccion = option_menu(
                 "Menú Principal",
-                ["Tareas", "Vacaciones", "Compensados", "Notas", "Recordatorios", "Calendario"],
-                icons=['list-check', 'calendar-check', 'clock-history', 'sticky', 'bell', 'calendar'],
+                ["Tareas", "Vacaciones", "Compensados", "Notas", "Recordatorios", "Calendario", "Horarios"],
+                icons=['list-check', 'calendar-check', 'clock-history', 'sticky', 'bell', 'calendar', 'people'],
                 menu_icon="cast",
                 default_index=0
             )
 
         st.sidebar.markdown("---")
-        st.sidebar.info("Esta app utiliza Google Sheets como backend.")
+        # st.sidebar.info("Esta app utiliza Google Sheets como backend.")
 
         if seccion == "Tareas":
             seccion_tareas(client, personal_list)
@@ -49,6 +50,9 @@ def main():
             seccion_recordatorios(client, personal_list)
         elif seccion == "Calendario":
             seccion_calendario(client)
+        elif seccion == "Horarios":
+            seccion_horarios(client, personal_list)
+
 
 if __name__ == "__main__":
     main()
