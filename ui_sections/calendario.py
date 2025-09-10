@@ -38,7 +38,26 @@ def seccion_calendario(client):
             df_compensados['Hasta fecha'] = pd.to_datetime(df_compensados['Hasta fecha'], errors='coerce')
             for _, row in df_compensados.iterrows():
                 if pd.notna(row['Desde fecha']) and pd.notna(row['Hasta fecha']):
-                    events.append({"title": f"Compensatorio: {row['Apellido, Nombre']}", "start": row['Desde fecha'].strftime('%Y-%m-%d'), "end": (row['Hasta fecha'] + pd.Timedelta(days=1)).strftime('%Y-%m-%d'), "color": "#32CD32"})
+                    # Check if time information is available and not empty
+                    has_start_time = 'Desde hora' in row and pd.notna(row['Desde hora']) and str(row['Desde hora']).strip() != ''
+                    has_end_time = 'Hasta hora' in row and pd.notna(row['Hasta hora']) and str(row['Hasta hora']).strip() != ''
+                    if has_start_time and has_end_time:
+                        # Format with time
+                        start_time = row['Desde hora'].strftime('%H:%M:%S') if hasattr(row['Desde hora'], 'strftime') else str(row['Desde hora'])
+                        end_time = row['Hasta hora'].strftime('%H:%M:%S') if hasattr(row['Hasta hora'], 'strftime') else str(row['Hasta hora'])
+                        start_dt = f"{row['Desde fecha'].strftime('%Y-%m-%d')}T{start_time}"
+                        end_dt = f"{row['Hasta fecha'].strftime('%Y-%m-%d')}T{end_time}"
+                    else:
+                        # Default to all-day event
+                        start_dt = row['Desde fecha'].strftime('%Y-%m-%d')
+                        end_dt = (row['Hasta fecha'] + pd.Timedelta(days=1)).strftime('%Y-%m-%d')
+                    
+                    events.append({
+                        "title": f"Compensatorio: {row['Apellido, Nombre']}", 
+                        "start": start_dt, 
+                        "end": end_dt, 
+                        "color": "#32CD32"
+                    })
 
         df_reminders = st.session_state.get("df_recordatorios", pd.DataFrame())
         if not df_reminders.empty:
@@ -71,7 +90,8 @@ def seccion_calendario(client):
             "center": "title",
             "right": "dayGridMonth,timeGridWeek,timeGridDay",
         },
-        "initialView": "dayGridMonth",
+        "initialView": "timeGridWeek",
+        "locale": "es",
     }
 
     calendar(events=st.session_state.calendar_events, options=calendar_options, key="calendar")
