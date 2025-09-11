@@ -59,6 +59,32 @@ def seccion_calendario(client):
                         "color": "#32CD32"
                     })
 
+        df_eventos = st.session_state.get("df_eventos", pd.DataFrame())
+        if not df_eventos.empty:
+            df_eventos['Desde fecha'] = pd.to_datetime(df_eventos['Desde fecha'], errors='coerce')
+            df_eventos['Hasta fecha'] = pd.to_datetime(df_eventos['Hasta fecha'], errors='coerce')
+            for _, row in df_eventos.iterrows():
+                if pd.notna(row['Desde fecha']) and pd.notna(row['Hasta fecha']):
+                    # Check if time information is available and not empty
+                    has_start_time = 'Desde hora' in row and pd.notna(row['Desde hora']) and str(row['Desde hora']).strip() != ''
+                    has_end_time = 'Hasta hora' in row and pd.notna(row['Hasta hora']) and str(row['Hasta hora']).strip() != ''
+                    if has_start_time and has_end_time:
+                        # Format with time
+                        start_time = row['Desde hora'].strftime('%H:%M:%S') if hasattr(row['Desde hora'], 'strftime') else str(row['Desde hora'])
+                        end_time = row['Hasta hora'].strftime('%H:%M:%S') if hasattr(row['Hasta hora'], 'strftime') else str(row['Hasta hora'])
+                        start_dt = f"{row['Desde fecha'].strftime('%Y-%m-%d')}T{start_time}"
+                        end_dt = f"{row['Hasta fecha'].strftime('%Y-%m-%d')}T{end_time}"
+                    else:
+                        # Default to all-day event
+                        start_dt = row['Desde fecha'].strftime('%Y-%m-%d')
+                        end_dt = (row['Hasta fecha'] + pd.Timedelta(days=1)).strftime('%Y-%m-%d')
+                    
+                    events.append({
+                        "title": f"Evento: {row['Nombre del Evento']}", 
+                        "start": start_dt, 
+                        "end": end_dt, 
+                        "color": "#DDA0DD"
+                    })
         df_reminders = st.session_state.get("df_recordatorios", pd.DataFrame())
         if not df_reminders.empty:
             df_reminders['Fecha'] = pd.to_datetime(df_reminders['Fecha'], errors='coerce')

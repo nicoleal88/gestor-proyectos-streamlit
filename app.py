@@ -8,6 +8,7 @@ from ui_sections.notas import seccion_notas
 from ui_sections.recordatorios import seccion_recordatorios
 from ui_sections.calendario import seccion_calendario
 from ui_sections.horarios import seccion_horarios
+from ui_sections.eventos import mostrar_seccion_eventos
 
 # --- FUNCIONES AUXILIARES ---
 def get_personal_list():
@@ -29,8 +30,8 @@ def main():
         with st.sidebar:
             seccion = option_menu(
                 "Menú Principal",
-                ["Tareas", "Vacaciones", "Compensados", "Notas", "Recordatorios", "Calendario", "Horarios"],
-                icons=['list-check', 'calendar-check', 'clock-history', 'sticky', 'bell', 'calendar', 'people'],
+                ["Tareas", "Vacaciones", "Compensados", "Eventos", "Notas", "Recordatorios", "Calendario", "Horarios"],
+                icons=['list-check', 'calendar-check', 'clock-history', 'calendar-event', 'sticky', 'bell', 'calendar', 'people'],
                 menu_icon="cast",
                 default_index=0
             )
@@ -48,6 +49,8 @@ def main():
             seccion_notas(client, personal_list)
         elif seccion == "Recordatorios":
             seccion_recordatorios(client, personal_list)
+        elif seccion == "Eventos":
+            mostrar_seccion_eventos(client)
         elif seccion == "Calendario":
             seccion_calendario(client)
         elif seccion == "Horarios":
