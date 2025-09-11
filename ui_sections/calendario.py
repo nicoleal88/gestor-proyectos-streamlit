@@ -53,7 +53,7 @@ def seccion_calendario(client):
                         end_dt = (row['Hasta fecha'] + pd.Timedelta(days=1)).strftime('%Y-%m-%d')
                     
                     events.append({
-                        "title": f"Compensatorio: {row['Apellido, Nombre']}", 
+                        "title": f"Compensatorio: {row['Apellido, Nombres']}", 
                         "start": start_dt, 
                         "end": end_dt, 
                         "color": "#32CD32"

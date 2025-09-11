@@ -293,7 +293,7 @@ def seccion_horarios(client, personal_list):
             showarrow=False,
             font=dict(color="red")
         )
-        st.plotly_chart(fig_jornada, use_container_width=True)
+        st.plotly_chart(fig_jornada, width='stretch')
 
         if empleado_seleccionado != 'Todos':
             st.subheader(f"Historial de Jornadas para {ID_NOMBRE_MAP.get(empleado_seleccionado, empleado_seleccionado)}")
@@ -331,7 +331,7 @@ def seccion_horarios(client, personal_list):
                     showarrow=False,
                     font=dict(color="red")
                 )
-                st.plotly_chart(fig_historial, use_container_width=True)
+                st.plotly_chart(fig_historial, width='stretch')
             else:
                 st.info("No hay datos para mostrar en el historial de jornadas para este filtro.")
             

@@ -66,7 +66,7 @@ def seccion_compensados(client, personal_list):
         tipo_compensatorio = st.radio("Tipo de compensatorio", ("Día completo", "Por horas"), key="tipo_compensatorio_radio")
 
         with st.form("compensados_form", clear_on_submit=True):
-            nombre = st.selectbox("Apellido, Nombre", options=["Seleccione persona..."] + personal_list)
+            nombre = st.selectbox("Apellido, Nombres", options=["Seleccione persona..."] + personal_list)
             fecha_solicitud = st.date_input("Fecha Solicitud", value=datetime.now())
             tipo = st.selectbox("Tipo", options=["Compensatorio"])
             
@@ -100,7 +100,7 @@ def seccion_compensados(client, personal_list):
         if not df_compensados.empty:
             st.markdown("#### Modificar o Eliminar un registro")
             df_compensados['row_number'] = range(2, len(df_compensados) + 2)
-            options = [f"Fila {row['row_number']}: {row['Apellido, Nombre']} - {row['Desde fecha'].strftime('%d/%m/%Y') if pd.notna(row['Desde fecha']) else ''} {row['Desde hora'] if not pd.isna(row['Desde hora']) else ''}" for _, row in df_compensados.iterrows()]
+            options = [f"Fila {row['row_number']}: {row['Apellido, Nombres']} - {row['Desde fecha'].strftime('%d/%m/%Y') if pd.notna(row['Desde fecha']) else ''} {row['Desde hora'] if not pd.isna(row['Desde hora']) else ''}" for _, row in df_compensados.iterrows()]
             option_to_edit = st.selectbox("Selecciona un registro para modificar o eliminar", options=[""] + options)
 
             if option_to_edit:
@@ -112,7 +112,7 @@ def seccion_compensados(client, personal_list):
                 tipo_compensatorio = st.radio("Tipo de compensatorio", ("Día completo", "Por horas"), index=0 if es_dia_completo else 1, key=tipo_compensatorio_key)
 
                 with st.form(f"edit_compensados_form_{row_number_to_edit}"):
-                    nombre = st.selectbox("Apellido, Nombre", options=["Seleccione persona..."] + personal_list, index=personal_list.index(record_data["Apellido, Nombre"]) + 1 if record_data["Apellido, Nombre"] in personal_list else 0)
+                    nombre = st.selectbox("Apellido, Nombres", options=["Seleccione persona..."] + personal_list, index=personal_list.index(record_data["Apellido, Nombres"]) + 1 if record_data["Apellido, Nombres"] in personal_list else 0)
                     fecha_solicitud = st.date_input("Fecha Solicitud", value=pd.to_datetime(record_data["Fecha Solicitud"]))
                     tipo = st.selectbox("Tipo", options=["Compensatorio"], index=0)
 
