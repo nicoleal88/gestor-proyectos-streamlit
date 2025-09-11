@@ -301,13 +301,29 @@ def seccion_horarios(client, personal_list):
             if not df_jornada_filtrada.empty:
                 df_jornada_filtrada = df_jornada_filtrada.copy()
                 df_jornada_filtrada['fecha'] = df_jornada_filtrada['fecha'].astype(str)
+                # Crear una copia para no modificar el DataFrame original
+                df_plot = df_jornada_filtrada.copy()
+                # Asegurarse de que la columna 'fecha' sea datetime
+                df_plot['fecha_dt'] = pd.to_datetime(df_plot['fecha'])
+                # Formatear la fecha para incluir el día de la semana en español
+                dias_semana = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
+                df_plot['fecha_formateada'] = df_plot['fecha_dt'].apply(
+                    lambda x: f"{dias_semana[x.weekday()]} {x.strftime('%d-%b-%Y')}"
+                )
+                
                 fig_historial = px.bar(
-                    df_jornada_filtrada,
+                    df_plot,
                     x='fecha',
                     y='duracion_horas',
                     title=f'Horas trabajadas por día - {ID_NOMBRE_MAP.get(empleado_seleccionado, empleado_seleccionado)}',
                     labels={'fecha': 'Fecha', 'duracion_horas': 'Horas Trabajadas'},
-                    template='plotly_white'
+                    template='plotly_white',
+                    custom_data=['fecha_formateada']
+                )
+                
+                # Actualizar el formato del hover
+                fig_historial.update_traces(
+                    hovertemplate='<b>%{customdata[0]}</b><br>Horas: %{y:.2f}<extra></extra>'
                 )
                 fig_historial.add_annotation(
                     xref="paper", x=1.01, y=8, yref="y",
