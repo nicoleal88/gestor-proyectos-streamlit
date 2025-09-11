@@ -72,11 +72,15 @@ def leer_pdf_query(path_pdf):
     """Lee el PDF de query y devuelve un DataFrame compatible."""
     rows = []
     with pdfplumber.open(path_pdf) as pdf:
-        for page in pdf.pages:
+        for i, page in enumerate(pdf.pages):
             table = page.extract_table()
             if table:
-                for row in table[1:]:  # Salta encabezado
-                    rows.append(row)
+                # Solo saltar el encabezado en la primera página
+                start_idx = 1 if i == 0 else 0
+                for row in table[start_idx:]:
+                    # Solo agregar filas que tengan datos
+                    if any(cell is not None for cell in row):
+                        rows.append(row)
     # Ajusta los nombres de columna según el PDF
     df_pdf = pd.DataFrame(rows, columns=["Date", "ID Number", "Name", "Time", "Status", "Verification"])
     # Unifica formato con el DataFrame principal
@@ -168,6 +172,38 @@ def seccion_horarios(client, personal_list):
             df_registros = df_pdf
 
     if df_registros is not None and not df_registros.empty:
+        # --- Eliminar registros duplicados o casi duplicados (menos de 1 minuto de diferencia) ---
+        df_registros = df_registros.sort_values(['id_empleado', 'fecha_hora'])
+        
+        # Crear una máscara para identificar registros a mantener
+        mask = pd.Series(True, index=df_registros.index)
+        
+        # Para cada empleado, verificar duplicados consecutivos
+        for empleado in df_registros['id_empleado'].unique():
+            empleado_mask = df_registros['id_empleado'] == empleado
+            empleado_indices = df_registros[empleado_mask].index
+            
+            # Calcular diferencias de tiempo entre registros consecutivos
+            for i in range(1, len(empleado_indices)):
+                idx_prev = empleado_indices[i-1]
+                idx_curr = empleado_indices[i]
+                
+                tiempo_anterior = df_registros.at[idx_prev, 'fecha_hora']
+                tiempo_actual = df_registros.at[idx_curr, 'fecha_hora']
+                
+                # Si la diferencia es menor a 1 minuto, marcar como duplicado
+                if (tiempo_actual - tiempo_anterior) < pd.Timedelta(minutes=1):
+                    mask.at[idx_curr] = False
+        
+        # Filtrar los registros duplicados
+        duplicados = df_registros[~mask]
+        df_registros = df_registros[mask]
+        
+        # Mostrar información de depuración
+        # if not duplicados.empty:
+        #     st.warning(f"Se encontraron {len(duplicados)} registros duplicados o casi duplicados (diferencia < 1 minuto):")
+        #     st.dataframe(duplicados[['id_empleado', 'fecha_hora']].sort_values(['id_empleado', 'fecha_hora']))
+        
         # --- Procesamiento y análisis sobre el DataFrame combinado ---
         # Recalcula la jornada laboral sobre el DataFrame combinado
         def sumar_intervalos(fechas):
@@ -284,7 +320,49 @@ def seccion_horarios(client, personal_list):
                 st.info("No hay datos para mostrar en el historial de jornadas para este filtro.")
             
             st.subheader("Jornadas del empleado seleccionado")
-            st.dataframe(df_jornada_filtrada)
+            
+            # Mostrar todos los registros del empleado seleccionado
+            if empleado_seleccionado != 'Todos':
+                # Filtrar registros del empleado seleccionado
+                registros_empleado = df_registros[df_registros['id_empleado'] == empleado_seleccionado].copy()
+                
+                # Agregar columna de fecha para agrupar
+                registros_empleado['fecha'] = pd.to_datetime(registros_empleado['fecha_hora']).dt.date
+                
+                # Ordenar por fecha y hora
+                registros_empleado = registros_empleado.sort_values('fecha_hora')
+                
+                # Mostrar los registros agrupados por fecha
+                st.subheader("Registros diarios")
+                for fecha, grupo in registros_empleado.groupby('fecha'):
+                    num_registros = len(grupo)
+                    # Determinar el color del encabezado basado en si es par o impar
+                    if num_registros % 2 != 0:
+                        # Usar HTML para aplicar estilos personalizados
+                        st.markdown(
+                            f"""
+                            <div style='background-color: #111111; border-left: 5px solid #f44336; padding: 0.5em; margin: 0.5em 0; border-radius: 0.3em;'>
+                                ⚠️ <strong>¡Atención!</strong> Este día tiene un número impar de registros ({num_registros}).
+                            </div>
+                            """,
+                            unsafe_allow_html=True
+                        )
+                    
+                    # Mostrar el expander con el contador de registros
+                    with st.expander(f"📅 {fecha.strftime('%d/%m/%Y')} - {num_registros} registro{'s' if num_registros != 1 else ''} {'(IMPAR)' if num_registros % 2 != 0 else ''}"):
+                        # Mostrar resumen de la jornada si existe
+                        jornada_dia = df_jornada_filtrada[df_jornada_filtrada['fecha'] == pd.Timestamp(fecha)]
+                        if not jornada_dia.empty:
+                            st.write(f"⏱️ **Duración total:** {jornada_dia['duracion_horas'].iloc[0]:.2f} horas")
+                            st.write(f"🕒 **Inicio:** {jornada_dia['inicio_jornada'].iloc[0].strftime('%H:%M')}")
+                            st.write(f"🏁 **Fin:** {jornada_dia['fin_jornada'].iloc[0].strftime('%H:%M')}")
+                        
+                        # Mostrar todos los registros del día
+                        st.dataframe(
+                            grupo[['fecha_hora']].rename(columns={'fecha_hora': 'Fecha y Hora'}),
+                            use_container_width=True,
+                            hide_index=True
+                        )
         else:
             # --- Mostrar los DataFrames completos al final de la página ---
             st.header("Datos completos")
