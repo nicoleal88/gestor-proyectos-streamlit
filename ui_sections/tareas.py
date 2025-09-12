@@ -95,7 +95,11 @@ def seccion_tareas(client, personal_list):
             col1, col2 = st.columns(2)
             status_options = df_tasks['Estado'].unique().tolist()
             responsable_options = df_tasks['Responsable'].unique().tolist()
-            selected_statuses = col1.multiselect("Filtrar por Estado", options=status_options)
+            selected_statuses = col1.multiselect(
+                "Filtrar por Estado", 
+                options=status_options,
+                default=["En curso", "Pendiente"]  # Valores por defecto
+            )
             selected_responsables = col2.multiselect("Filtrar por Responsable", options=responsable_options)
 
             df_filtered = df_tasks.copy()
