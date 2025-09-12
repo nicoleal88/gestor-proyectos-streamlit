@@ -281,17 +281,17 @@ def seccion_horarios(client, personal_list):
             labels={'nombre': 'Empleado', 'duracion_horas': 'Horas Trabajadas'},
             template='plotly_white'
         )
-        fig_jornada.add_shape(
-            type='line',
-            x0=-0.5, x1=len(df_jornada_filtrada['nombre'].unique())-0.5,
-            y0=8, y1=8,
-            line=dict(color='red', width=2, dash='dash'),
-        )
-        fig_jornada.add_annotation(
-            xref="paper", x=1.01, y=8, yref="y",
-            text="8 hs ideales",
-            showarrow=False,
-            font=dict(color="red")
+        
+        # Añadir línea horizontal en 8 horas
+        fig_jornada.add_hline(
+            y=8,
+            line_dash="dash",
+            line_color="red",
+            annotation_text="8 hs ideales",
+            annotation_position="top right",
+            annotation_font_size=12,
+            annotation_font_color="red",
+            opacity=0.7
         )
         st.plotly_chart(fig_jornada, width='stretch')
 
@@ -325,11 +325,17 @@ def seccion_horarios(client, personal_list):
                 fig_historial.update_traces(
                     hovertemplate='<b>%{customdata[0]}</b><br>Horas: %{y:.2f}<extra></extra>'
                 )
-                fig_historial.add_annotation(
-                    xref="paper", x=1.01, y=8, yref="y",
-                    text="8 hs ideales",
-                    showarrow=False,
-                    font=dict(color="red")
+                
+                # Añadir línea horizontal en 8 horas
+                fig_historial.add_hline(
+                    y=8,
+                    line_dash="dash",
+                    line_color="red",
+                    annotation_text="8 hs ideales",
+                    annotation_position="top right",
+                    annotation_font_size=12,
+                    annotation_font_color="red",
+                    opacity=0.7
                 )
                 st.plotly_chart(fig_historial, width='stretch')
             else:
@@ -376,7 +382,7 @@ def seccion_horarios(client, personal_list):
                         # Mostrar todos los registros del día
                         st.dataframe(
                             grupo[['fecha_hora']].rename(columns={'fecha_hora': 'Fecha y Hora'}),
-                            use_container_width=True,
+                            width='stretch',
                             hide_index=True
                         )
         else:
