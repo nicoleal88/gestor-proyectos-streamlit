@@ -111,12 +111,41 @@ def seccion_tareas(client, personal_list):
             df_filtered['Fecha límite'] = pd.to_datetime(df_filtered['Fecha límite'], errors='coerce')
             df_display = df_filtered.sort_values(by="Fecha límite").copy()
             today = datetime.now().date()
+            # Aplicar formato al título de la tarea
             df_display['Título Tarea'] = df_display.apply(
                 lambda row: f"🚨 {row['Título Tarea']}" if pd.notna(row['Fecha límite']) and row['Fecha límite'].date() < today and row['Estado'] != 'Finalizada' else row['Título Tarea'],
                 axis=1
             )
-            st.dataframe(df_display.style.apply(highlight_overdue, axis=1).map(style_estado, subset=['Estado']), width='stretch', hide_index=True,
-                         column_config={'Fecha límite': st.column_config.DateColumn(format="DD/MM/YYYY")})
+            
+            # Obtener todos los comentarios de una sola vez
+            all_comments = get_sheet_data(client, "Comentarios")
+            if not all_comments.empty and 'ID_Tarea' in all_comments.columns:
+                all_comments['ID_Tarea'] = all_comments['ID_Tarea'].astype(str)
+                # Agrupar comentarios por ID de tarea
+                comments_by_task = {}
+                for task_id, group in all_comments.groupby('ID_Tarea'):
+                    comments = []
+                    for _, row in group.iterrows():
+                        date_str = pd.to_datetime(row['Fecha']).strftime('%d/%m/%Y')
+                        comments.append(f"{date_str}: {row['Comentario']}")
+                    comments_by_task[task_id] = "\n---\n".join(comments)
+                
+                # Mapear comentarios a las tareas
+                df_display['Comentarios'] = df_display['ID'].astype(str).map(comments_by_task).fillna('')
+            else:
+                df_display['Comentarios'] = ''
+            
+            # Mostrar el dataframe con la nueva columna
+            st.dataframe(
+                df_display.style.apply(highlight_overdue, axis=1)
+                               .map(style_estado, subset=['Estado']), 
+                width='stretch', 
+                hide_index=True,
+                column_config={
+                    'Fecha límite': st.column_config.DateColumn(format="DD/MM/YYYY"),
+                    'Comentarios': st.column_config.TextColumn(width='large')
+                }
+            )
         else:
             st.info("No hay tareas registradas.")
 
