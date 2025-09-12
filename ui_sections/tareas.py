@@ -36,9 +36,11 @@ def generar_reporte_markdown(task_data, comments_df):
         comments_df_sorted = comments_df.sort_values(by="Fecha", ascending=True)
         for _, comment in comments_df_sorted.iterrows():
             fecha_comentario = pd.to_datetime(comment['Fecha']).strftime('%d/%m/%Y')
+            # Formatear cada línea del comentario con el prefijo '> '
+            comentario_formateado = '\n> '.join(comment['Comentario'].split('\n'))
             reporte += f"""
 **Fecha:** {fecha_comentario}
-> {comment['Comentario']}
+> {comentario_formateado}
 
 """
     else:
