@@ -30,23 +30,20 @@ for loc in spanish_locales:
 if not locale_configured:
     st.warning("No se pudo configurar el locale en español. Las fechas se mostrarán en inglés.")
 
-def get_weather():
-    """Obtener datos del clima usando OpenWeatherMap API v3.0"""
+@st.cache_data(ttl=3600)  # Cache por 1 hora
+def obtener_pronostico_extendido(lat=-35.4755, lon=-69.5843):
+    """Obtener pronóstico extendido de OpenWeatherMap API"""
     api_key = st.secrets.get('api_keys', {}).get('openweather')
     if not api_key:
         st.warning("No se encontró la clave de OpenWeather API en secrets.toml")
         return None
 
     try:
-        # Coordenadas de Malargüe
-        lat = -35.4755
-        lon = -69.5843
-        
         base_url = "https://api.openweathermap.org/data/3.0/onecall"
         params = {
             'lat': lat,
             'lon': lon,
-            'exclude': 'minutely,hourly,daily,alerts',
+            'exclude': 'current,minutely,hourly,alerts',
             'appid': api_key,
             'units': 'metric',
             'lang': 'es'
@@ -56,21 +53,42 @@ def get_weather():
         data = response.json()
         
         if response.status_code == 200:
-            current = data.get('current', {})
-            weather = current.get('weather', [{}])[0] if current.get('weather') else {}
-            
+            pronostico = data.get('daily', [])[:5]  # Solo los próximos 5 días
+            # Agregar timestamp a cada día para debug
+            for dia in pronostico:
+                dia['_cached_at'] = datetime.now().timestamp()
+            return pronostico
+    except Exception as e:
+        st.error(f"Error al obtener el pronóstico: {e}")
+    return None
+
+@st.cache_data(ttl=3600)  # Cache por 1 hora
+def get_weather(lat=-35.4755, lon=-69.5843):
+    """Obtener el clima actual desde OpenWeatherMap"""
+    api_key = st.secrets.get('api_keys', {}).get('openweather')
+    if not api_key:
+        st.warning("No se encontró la clave de OpenWeather API en secrets.toml")
+        return None
+
+    try:
+        response = requests.get(
+            f'https://api.openweathermap.org/data/2.5/weather?lat={lat}&lon={lon}&appid={api_key}&units=metric&lang=es'
+        )
+        data = response.json()
+        
+        if response.status_code == 200:
             return {
-                'temperature': current.get('temp'),
-                'feels_like': current.get('feels_like'),
-                'description': weather.get('description', '').capitalize(),
-                'humidity': current.get('humidity'),
-                'wind_speed': current.get('wind_speed'),
-                'icon': weather.get('icon'),
-                'pressure': current.get('pressure'),
-                'visibility': current.get('visibility')
+                'temperature': data['main']['temp'],
+                'feels_like': data['main']['feels_like'],
+                'humidity': data['main']['humidity'],
+                'pressure': data['main']['pressure'],
+                'wind_speed': data['wind']['speed'] * 3.6,  # Convertir a km/h
+                'description': data['weather'][0]['description'].capitalize(),
+                'visibility': data.get('visibility', 10000),  # En metros
+                'timestamp': datetime.now().timestamp()  # Agregar timestamp para debug
             }
     except Exception as e:
-        st.error(f"Error al obtener datos del clima: {e}")
+        st.error(f"Error al obtener el clima: {e}")
     return None
 
 def get_exchange_rates(base_currency='USD', target_currencies=['ARS', 'EUR', 'BRL']):
@@ -91,6 +109,7 @@ def get_exchange_rates(base_currency='USD', target_currencies=['ARS', 'EUR', 'BR
         st.error(f"Error al obtener tasas de cambio: {e}")
     return None
 
+@st.cache_data(ttl=600)  # Cache por 10 minutos
 def obtener_tipo_cambio() -> Optional[Dict[str, Dict[str, float]]]:
     """Obtiene los tipos de cambio de DolarAPI"""
     try:
@@ -107,15 +126,18 @@ def obtener_tipo_cambio() -> Optional[Dict[str, Dict[str, float]]]:
         return {
             'oficial': {
                 'compra': oficial.get('compra', 0),
-                'venta': oficial.get('venta', 0)
+                'venta': oficial.get('venta', 0),
+                'timestamp': datetime.now().timestamp()
             },
             'blue': {
                 'compra': blue.get('compra', 0),
-                'venta': blue.get('venta', 0)
+                'venta': blue.get('venta', 0),
+                'timestamp': datetime.now().timestamp()
             },
             'euro': {
                 'compra': euro.get('compra', 0),
-                'venta': euro.get('venta', 0)
+                'venta': euro.get('venta', 0),
+                'timestamp': datetime.now().timestamp()
             }
         }
     except Exception as e:
@@ -152,15 +174,15 @@ def mostrar_seccion_bienvenida():
         fecha = f"{dia_semana}, {now.day} de {mes} de {now.year}"
     
     st.subheader(f"📅 {fecha}")
-    
+    st.markdown("---")
+
     # Obtener el clima actual
     weather = get_weather()
     pronostico = obtener_pronostico_extendido()
     tipos_cambio = obtener_tipo_cambio()
     
     # Mostrar información del clima en 3 columnas
-    st.markdown("### 🌦️ Información del Clima")
-    col1, col2, col3 = st.columns(3)
+    col1, col2, col3 = st.columns([3, 4, 4])
     
     with col1:
         st.markdown("### 🌤️ Clima en Malargüe")
@@ -168,9 +190,9 @@ def mostrar_seccion_bienvenida():
             st.metric("Temperatura", f"{weather['temperature']:.1f}°C")
             st.caption(f"Sensación térmica: {weather['feels_like']:.1f}°C")
             st.caption(f"{weather['description']}")
-            st.caption(f"💧 Humedad: {weather['humidity']}%")
-            st.caption(f"💨 Viento: {weather['wind_speed']} km/h")
-            st.caption(f"🪟 Presión: {weather['pressure']} hPa")
+            st.caption(f"💧 Humedad: {weather['humidity']:.1f}%")
+            st.caption(f"💨 Viento: {weather['wind_speed']:.1f} km/h")
+            st.caption(f"🪟 Presión: {weather['pressure']:.1f} hPa")
             if weather.get('visibility'):
                 st.caption(f"👁️ Visibilidad: {weather['visibility']/1000:.1f} km")
         else:
@@ -186,17 +208,6 @@ def mostrar_seccion_bienvenida():
             fechas = [datetime.fromtimestamp(dia.get('dt', 0)).strftime('%a %d/%m') for dia in pronostico]
             temps_min = [dia.get('temp', {}).get('min') for dia in pronostico]
             temps_max = [dia.get('temp', {}).get('max') for dia in pronostico]
-            
-            # Agregar barras de rango de temperatura
-            fig_temp.add_trace(go.Bar(
-                x=fechas,
-                y=[t_max - t_min for t_min, t_max in zip(temps_min, temps_max)],
-                base=temps_min,
-                name='Rango de temperatura',
-                marker_color='rgba(255, 200, 200, 0.5)',
-                hoverinfo='skip',
-                showlegend=False
-            ))
             
             # Agregar línea de temperatura máxima
             fig_temp.add_trace(go.Scatter(
@@ -300,19 +311,22 @@ def mostrar_seccion_bienvenida():
         col1, col2, col3 = st.columns(3)
         
         with col1:
-            st.markdown("**Dólar Oficial**")
-            st.markdown(f"Compra: ${tipos_cambio['oficial']['compra']:,.2f}")
-            st.markdown(f"Venta: ${tipos_cambio['oficial']['venta']:,.2f}")
+            st.markdown("#### **Dólar Oficial**")
+            st.metric(label="Compra", value=f"${tipos_cambio['oficial']['compra']:,.2f}")
+            st.metric(label="Venta", value=f"${tipos_cambio['oficial']['venta']:,.2f}")
+        
+        # with col2:
+        #     st.markdown("#### **Dólar Blue**")
+        #     st.metric(label="Compra", value=f"${tipos_cambio['blue']['compra']:,.2f}")
+        #     st.metric(label="Venta", value=f"${tipos_cambio['blue']['venta']:,.2f}")
         
         with col2:
-            st.markdown("**Dólar Blue**")
-            st.markdown(f"Compra: ${tipos_cambio['blue']['compra']:,.2f}")
-            st.markdown(f"Venta: ${tipos_cambio['blue']['venta']:,.2f}")
+            st.markdown("#### **Euro Oficial**")
+            st.metric(label="Compra", value=f"${tipos_cambio['euro']['compra']:,.2f}")
+            st.metric(label="Venta", value=f"${tipos_cambio['euro']['venta']:,.2f}")
         
-        with col3:
-            st.markdown("**Euro Oficial**")
-            st.markdown(f"Compra: ${tipos_cambio['euro']['compra']:,.2f}")
-            st.markdown(f"Venta: ${tipos_cambio['euro']['venta']:,.2f}")
+        # with col3:
+            
         
         # Mostrar última actualización
         st.markdown(f"<div style='text-align: center;'><small>Última actualización: {datetime.now().strftime('%d/%m/%Y %H:%M')}</small></div>", unsafe_allow_html=True)

@@ -1,19 +1,121 @@
 import sys
 import os
+import requests
+from icalendar import Calendar
+from datetime import datetime, timedelta, timezone
 
 # Add the parent directory to the path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 import streamlit as st
 import pandas as pd
-from datetime import datetime
 from streamlit_calendar import calendar
+
+def get_google_calendar_events(ical_url, days_ahead=365):
+    """Obtiene eventos de un calendario de Google a través de su URL iCal.
+    
+    Args:
+        ical_url: URL del calendario iCal
+        days_ahead: Número de días en el futuro para buscar eventos recurrentes
+        
+    Returns:
+        Lista de eventos formateados para el calendario
+    """
+    try:
+        import recurring_ical_events
+        
+        # Hacer la petición al calendario
+        response = requests.get(ical_url)
+        response.raise_for_status()
+        
+        # Parsear el calendario
+        gcal = Calendar.from_ical(response.text)
+        
+        # Configurar el rango de fechas para eventos recurrentes
+        today = datetime.now()
+        max_date = today + timedelta(days=days_ahead)
+        
+        # Obtener la zona horaria local
+        local_tz = today.astimezone().tzinfo
+        
+        # Obtener todos los eventos en el rango de fechas
+        ical_events = recurring_ical_events.of(gcal).between(
+            (today.year, today.month, today.day),
+            (max_date.year, max_date.month, max_date.day)
+        )
+        
+        events = []
+        for event in ical_events:
+            start = event.get('DTSTART').dt
+            end = event.get('DTEND', event.get('DTSTART')).dt
+            
+            # Convertir a datetime con zona horaria si es necesario
+            if isinstance(start, datetime):
+                # Si no tiene zona horaria, asumir UTC
+                if start.tzinfo is None:
+                    start = start.replace(tzinfo=timezone.utc)
+                # Convertir a zona horaria local
+                start = start.astimezone(local_tz)
+                start_str = start.strftime('%Y-%m-%dT%H:%M:%S')
+            else:
+                # Para eventos de todo el día, no necesitamos conversión de zona horaria
+                start_str = start.strftime('%Y-%m-%d')
+            
+            if isinstance(end, datetime):
+                # Si no tiene zona horaria, asumir UTC
+                if end.tzinfo is None:
+                    end = end.replace(tzinfo=timezone.utc)
+                # Convertir a zona horaria local
+                end = end.astimezone(local_tz)
+                end_str = end.strftime('%Y-%m-%dT%H:%M:%S')
+            else:
+                # Para eventos de todo el día, sumamos un día
+                end_date = end if isinstance(end, datetime) else datetime.combine(end, datetime.min.time())
+                end_str = (end_date + timedelta(days=1)).strftime('%Y-%m-%d')
+            
+            event_data = {
+                'title': str(event.get('SUMMARY', 'Evento sin título')),
+                'start': start_str,
+                'end': end_str,
+                'color': '#FFA500',  # Naranja para los eventos de Google Calendar
+                'allDay': not isinstance(start, datetime)  # True si es evento de todo el día
+            }
+            
+            # Añadir descripción si existe
+            description = event.get('DESCRIPTION')
+            if description:
+                event_data['description'] = str(description)
+            
+            # Añadir ubicación si existe
+            location = event.get('LOCATION')
+            if location:
+                event_data['location'] = str(location)
+            
+            events.append(event_data)
+            
+        return events
+    except Exception as e:
+        st.error(f"Error al obtener eventos del calendario: {str(e)}")
+        import traceback
+        st.error(traceback.format_exc())
+        return []
 
 def seccion_calendario(client):
     st.subheader("🗓️ Calendario Unificado")
 
     if "calendar_events" not in st.session_state:
         st.session_state.calendar_events = []
+        
+    # Obtener la URL del calendario de Google desde secrets.toml
+    GOOGLE_CALENDAR_URL = st.secrets.get("google_calendar", {}).get("url")
+    
+    # Obtener eventos del calendario de Google si la URL está configurada
+    google_events = []
+    if GOOGLE_CALENDAR_URL:
+        with st.spinner('Cargando eventos del calendario...'):
+            google_events = get_google_calendar_events(GOOGLE_CALENDAR_URL)
+    else:
+        st.warning("No se ha configurado la URL del calendario de Google en secrets.toml")
 
     def update_calendar_events():
         events = []
@@ -92,6 +194,9 @@ def seccion_calendario(client):
                 if pd.notna(row['Fecha']):
                     events.append({"title": f"Recordatorio: {row['Mensaje']}", "start": row['Fecha'].strftime('%Y-%m-%d'), "color": "#8A2BE2"})
 
+        # Añadir eventos de Google Calendar
+        events.extend(google_events)
+        
         df_personal = st.session_state.get("df_personal", pd.DataFrame())
         if not df_personal.empty and 'Fecha de nacimiento' in df_personal.columns:
             df_personal['Fecha de nacimiento'] = pd.to_datetime(df_personal['Fecha de nacimiento'], errors='coerce', dayfirst=True)
