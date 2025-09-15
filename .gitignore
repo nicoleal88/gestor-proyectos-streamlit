@@ -8,3 +8,5 @@ credenciales.json
 ui_sections/__pycache__/*
 __pycache__/*
 ToDo.md
+
+.streamlit

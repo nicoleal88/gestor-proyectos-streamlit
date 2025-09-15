@@ -9,6 +9,7 @@ from ui_sections.recordatorios import seccion_recordatorios
 from ui_sections.calendario import seccion_calendario
 from ui_sections.horarios import seccion_horarios
 from ui_sections.eventos import mostrar_seccion_eventos
+from ui_sections.bienvenida import mostrar_seccion_bienvenida
 
 # --- FUNCIONES AUXILIARES ---
 def get_personal_list():
@@ -30,8 +31,8 @@ def main():
         with st.sidebar:
             seccion = option_menu(
                 "Menú Principal",
-                ["Tareas", "Vacaciones", "Compensados", "Eventos", "Notas", "Recordatorios", "Calendario", "Horarios"],
-                icons=['list-check', 'calendar-check', 'clock-history', 'calendar-event', 'sticky', 'bell', 'calendar', 'people'],
+                ["Inicio", "Tareas", "Vacaciones", "Compensados", "Eventos", "Notas", "Recordatorios", "Calendario", "Horarios"],
+                icons=['house', 'list-check', 'calendar-check', 'clock-history', 'calendar-event', 'sticky', 'bell', 'calendar', 'people'],
                 menu_icon="cast",
                 default_index=0
             )
@@ -39,7 +40,9 @@ def main():
         st.sidebar.markdown("---")
         # st.sidebar.info("Esta app utiliza Google Sheets como backend.")
 
-        if seccion == "Tareas":
+        if seccion == "Inicio":
+            mostrar_seccion_bienvenida()
+        elif seccion == "Tareas":
             seccion_tareas(client, personal_list)
         elif seccion == "Vacaciones":
             seccion_vacaciones(client, personal_list)
