@@ -11,6 +11,11 @@ from ui_sections.horarios import seccion_horarios
 from ui_sections.eventos import mostrar_seccion_eventos
 from ui_sections.bienvenida import mostrar_seccion_bienvenida
 
+def login_screen():
+    st.header("Gestor de Proyectos - Acceso Restringido")
+    st.subheader("Por favor inicia sesión para continuar")
+    st.button("Iniciar sesión con Google", on_click=st.login)
+
 # --- FUNCIONES AUXILIARES ---
 def get_personal_list():
     if "df_personal" in st.session_state and not st.session_state.df_personal.empty:
@@ -20,7 +25,19 @@ def get_personal_list():
 # --- APP PRINCIPAL ---
 def main():
     st.set_page_config(page_title="Gestor de Proyectos", layout="wide")
-    # st.markdown("<h1 style='text-align:center'>📊 Gestor de Proyectos</h1>", unsafe_allow_html=True)
+    
+    # Verificar si el usuario ha iniciado sesión
+    if not st.user.is_logged_in:
+        login_screen()
+        return
+        
+    # Mostrar contenido principal solo si el usuario está autenticado
+    st.sidebar.markdown(f"**Usuario:** {st.user.name}")
+    st.sidebar.markdown(f"*{st.user.email}*")
+    st.sidebar.button("Cerrar sesión", on_click=st.logout)
+    st.sidebar.markdown("---")
+
+    # st.markdown(f"<h1 style='text-align:center'>📊 Gestor de Proyectos</h1>", unsafe_allow_html=True)
 
     client = connect_to_google_sheets()
 
@@ -36,9 +53,6 @@ def main():
                 menu_icon="cast",
                 default_index=0
             )
-
-        st.sidebar.markdown("---")
-        # st.sidebar.info("Esta app utiliza Google Sheets como backend.")
 
         if seccion == "Inicio":
             mostrar_seccion_bienvenida()
