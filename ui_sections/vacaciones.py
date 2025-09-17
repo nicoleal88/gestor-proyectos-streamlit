@@ -18,9 +18,9 @@ def seccion_vacaciones(client, personal_list):
 
     if not df_vacaciones.empty:
         df_vacaciones['Fecha inicio'] = pd.to_datetime(df_vacaciones['Fecha inicio'], errors='coerce')
-        df_vacaciones['Fecha fin'] = pd.to_datetime(df_vacaciones['Fecha fin'], errors='coerce')
+        df_vacaciones['Fecha regreso'] = pd.to_datetime(df_vacaciones['Fecha regreso'], errors='coerce')
         # Ajustar la fecha fin para mostrar el último día de vacaciones (un día antes del regreso)
-        df_vacaciones['Último día de vacaciones'] = df_vacaciones['Fecha fin'] - pd.Timedelta(days=1)
+        df_vacaciones['Último día de vacaciones'] = df_vacaciones['Fecha regreso'] - pd.Timedelta(days=1) 
         
         today = pd.to_datetime(datetime.now().date())
         # Ajustar la lógica para usar el último día de vacaciones en lugar de la fecha de regreso
@@ -42,7 +42,7 @@ def seccion_vacaciones(client, personal_list):
         def style_status(row):
             today = pd.to_datetime(datetime.now().date()).date()
             start_date = pd.to_datetime(row['Fecha inicio']).date()
-            last_vacation_day = (pd.to_datetime(row['Fecha fin']) - pd.Timedelta(days=1)).date()
+            last_vacation_day = (pd.to_datetime(row['Fecha regreso']) - pd.Timedelta(days=1)).date()
             style = ''
             if start_date <= today and last_vacation_day >= today:
                 style = 'background-color: lightblue'  # En curso (blue)
@@ -54,8 +54,8 @@ def seccion_vacaciones(client, personal_list):
 
         # Crear una copia para mostrar, ajustando las fechas según lo necesario
         df_display_modified = df_display.copy()
-        # Mostrar la fecha de fin como el último día de vacaciones
-        df_display_modified['Fecha fin'] = df_display_modified['Fecha fin'] - pd.Timedelta(days=1)
+        # Mostrar la fecha de regreso como el último día de vacaciones
+        df_display_modified['Fecha regreso'] = df_display_modified['Fecha regreso']
         
         st.dataframe(
             df_display_modified.style.apply(style_status, axis=1),
@@ -66,38 +66,35 @@ def seccion_vacaciones(client, personal_list):
                     format="DD/MM/YYYY",
                     help="Primer día de vacaciones"
                 ),
-                'Fecha fin': st.column_config.DateColumn(
+                'Fecha regreso': st.column_config.DateColumn(
                     format="DD/MM/YYYY",
-                    help="Último día de vacaciones (el regreso al trabajo es al día siguiente)"
+                    help="Regreso al trabajo"
                 ),
                 'Fecha solicitud': st.column_config.DateColumn(format="DD/MM/YYYY")
             }
         )
         
-        # Agregar nota aclaratoria
-        st.caption("ℹ️ La 'Fecha fin' muestra el último día de vacaciones. El regreso al trabajo es al día siguiente.")
-
     with nueva_licencia:
         with st.form("nueva_vacacion_form", clear_on_submit=True):
             nombre = st.selectbox("Apellido, Nombres", options=["Seleccione persona..."] + personal_list)
             fecha_solicitud = st.date_input("Fecha de Solicitud", value=datetime.now())
             tipo = st.selectbox("Tipo", options=["Licencia Ordinaria 2024", "Licencia Ordinaria 2025"])
             fecha_inicio = st.date_input("Fecha de Inicio")
-            fecha_fin = st.date_input("Fecha de Fin")
+            fecha_regreso = st.date_input("Fecha de Regreso")
             observaciones = st.text_area("Observaciones", value="Pendientes: ")
 
             if st.form_submit_button("Agregar Registro"):
                 if nombre == "Seleccione persona...":
                     st.warning("Por favor, seleccione una persona.")
-                elif fecha_inicio >= fecha_fin:
+                elif fecha_inicio >= fecha_regreso:
                     st.error("La fecha de inicio debe ser anterior a la fecha de regreso al trabajo.")
                 else:
                     # Mostrar confirmación con la duración real de las vacaciones
-                    duracion = (fecha_fin - fecha_inicio).days
-                    st.info(f"Se registrarán {duracion} días de vacaciones desde {fecha_inicio.strftime('%d/%m/%Y')} hasta {(fecha_fin - pd.Timedelta(days=1)).strftime('%d/%m/%Y')} (inclusive).")
+                    duracion = (fecha_regreso - fecha_inicio).days
+                    st.info(f"Se registrarán {duracion} días de vacaciones desde {fecha_inicio.strftime('%d/%m/%Y')} hasta {(fecha_regreso - pd.Timedelta(days=1)).strftime('%d/%m/%Y')} (inclusive).")
                     
                     # Guardar los datos con la fecha de fin como el día de regreso al trabajo
-                    new_row = [nombre, fecha_solicitud.strftime('%Y-%m-%d'), tipo, fecha_inicio.strftime('%Y-%m-%d'), fecha_fin.strftime('%Y-%m-%d'), observaciones]
+                    new_row = [nombre, fecha_solicitud.strftime('%Y-%m-%d'), tipo, fecha_inicio.strftime('%Y-%m-%d'), fecha_regreso.strftime('%Y-%m-%d'), observaciones]
                     sheet.append_row(new_row)
                     refresh_data(client, sheet_name)
                     st.success("Registro agregado exitosamente.")
@@ -118,13 +115,13 @@ def seccion_vacaciones(client, personal_list):
                     fecha_solicitud = st.date_input("Fecha de Solicitud", value=pd.to_datetime(record_data["Fecha solicitud"]))
                     tipo = st.selectbox("Tipo", options=["Licencia Ordinaria 2024", "Licencia Ordinaria 2025"], index=["Licencia Ordinaria 2024", "Licencia Ordinaria 2025"].index(record_data["Tipo"]))
                     fecha_inicio = st.date_input("Fecha de Inicio", value=pd.to_datetime(record_data["Fecha inicio"]))
-                    fecha_fin = st.date_input("Fecha de Fin", value=pd.to_datetime(record_data["Fecha fin"]))
+                    fecha_regreso = st.date_input("Fecha de Regreso", value=pd.to_datetime(record_data["Fecha regreso"]))
                     observaciones = st.text_area("Observaciones", value=record_data["Observaciones"])
 
                     col_mod, col_del = st.columns(2)
                     if col_mod.form_submit_button("Guardar Cambios"):
                         if nombre != "Seleccione persona...":
-                            update_values = [nombre, fecha_solicitud.strftime('%Y-%m-%d'), tipo, fecha_inicio.strftime('%Y-%m-%d'), fecha_fin.strftime('%Y-%m-%d'), observaciones]
+                            update_values = [nombre, fecha_solicitud.strftime('%Y-%m-%d'), tipo, fecha_inicio.strftime('%Y-%m-%d'), fecha_regreso.strftime('%Y-%m-%d'), observaciones]
                             sheet.update(f'A{row_number_to_edit}:F{row_number_to_edit}', [update_values])
                             refresh_data(client, sheet_name)
                             st.success("¡Registro actualizado!")

@@ -129,12 +129,12 @@ def seccion_calendario(client):
         df_vacations = st.session_state.get("df_vacaciones", pd.DataFrame())
         if not df_vacations.empty:
             df_vacations['Fecha inicio'] = pd.to_datetime(df_vacations['Fecha inicio'], errors='coerce')
-            df_vacations['Fecha fin'] = pd.to_datetime(df_vacations['Fecha fin'], errors='coerce')
+            df_vacations['Fecha regreso'] = pd.to_datetime(df_vacations['Fecha regreso'], errors='coerce')
             for _, row in df_vacations.iterrows():
-                if pd.notna(row['Fecha inicio']) and pd.notna(row['Fecha fin']):
+                if pd.notna(row['Fecha inicio']) and pd.notna(row['Fecha regreso']):
                     # Usar la fecha de fin directamente (sin sumar un día) ya que ya es el día de regreso
                     # y queremos que el evento termine el día anterior
-                    end_date = row['Fecha fin']
+                    end_date = row['Fecha regreso']
                     events.append({
                         "title": f"Licencia: {row['Apellido, Nombres']}", 
                         "start": row['Fecha inicio'].strftime('%Y-%m-%d'), 
