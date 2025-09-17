@@ -2,6 +2,9 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import pdfplumber
+import warnings
+
+warnings.filterwarnings("ignore", message=".*FontBBox.*")
 
 # --- Configuración de la Página ---
 st.set_page_config(
@@ -71,28 +74,51 @@ def cargar_y_procesar_datos(archivo_subido):
 def leer_pdf_query(path_pdf):
     """Lee el PDF de query y devuelve un DataFrame compatible."""
     rows = []
-    with pdfplumber.open(path_pdf) as pdf:
-        for i, page in enumerate(pdf.pages):
-            table = page.extract_table()
-            if table:
-                # Solo saltar el encabezado en la primera página
-                start_idx = 1 if i == 0 else 0
-                for row in table[start_idx:]:
-                    # Solo agregar filas que tengan datos
-                    if any(cell is not None for cell in row):
-                        rows.append(row)
-    # Ajusta los nombres de columna según el PDF
-    df_pdf = pd.DataFrame(rows, columns=["Date", "ID Number", "Name", "Time", "Status", "Verification"])
-    # Unifica formato con el DataFrame principal
-    df_pdf['id_empleado'] = df_pdf['ID Number'].astype(str)
-    df_pdf['fecha_hora'] = pd.to_datetime(df_pdf['Date'] + ' ' + df_pdf['Time'])
-    df_pdf['fecha'] = pd.to_datetime(df_pdf['Date']).dt.date
-    df_pdf['hora'] = pd.to_datetime(df_pdf['Time']).dt.hour
-    # Puedes agregar columnas dummy para compatibilidad
-    df_pdf['col_3'] = None
-    df_pdf['col_4'] = None
-    df_pdf['col_5'] = None
-    return df_pdf[['id_empleado', 'fecha_hora', 'col_3', 'col_4', 'col_5', 'fecha', 'hora']]
+    try:
+        with pdfplumber.open(path_pdf) as pdf:
+            for i, page in enumerate(pdf.pages):
+                table = page.extract_table()
+                if table:
+                    # Solo saltar el encabezado en la primera página
+                    start_idx = 1 if i == 0 else 0
+                    for row in table[start_idx:]:
+                        # Solo agregar filas que tengan datos
+                        if any(cell is not None for cell in row):
+                            rows.append(row)
+        
+        # Ajusta los nombres de columna según el PDF
+        df_pdf = pd.DataFrame(rows, columns=["Date", "ID Number", "Name", "Time", "Status", "Verification"])
+        
+        # Limpiar y convertir fechas y horas
+        df_pdf = df_pdf.dropna(subset=['Date', 'Time'])
+        
+        # Unificar formato con el DataFrame principal
+        df_pdf['id_empleado'] = df_pdf['ID Number'].astype(str)
+        
+        # Convertir fechas y horas con formato explícito
+        df_pdf['fecha_hora'] = pd.to_datetime(
+            df_pdf['Date'] + ' ' + df_pdf['Time'],
+            format='%d/%m/%Y %H:%M:%S',  # Ajusta este formato según tu PDF
+            errors='coerce'  # Convierte errores a NaT
+        )
+        
+        # Eliminar filas con fechas/horas inválidas
+        df_pdf = df_pdf.dropna(subset=['fecha_hora'])
+        
+        # Extraer fecha y hora
+        df_pdf['fecha'] = df_pdf['fecha_hora'].dt.date
+        df_pdf['hora'] = df_pdf['fecha_hora'].dt.hour
+        
+        # Columnas dummy para compatibilidad
+        df_pdf['col_3'] = None
+        df_pdf['col_4'] = None
+        df_pdf['col_5'] = None
+        
+        return df_pdf[['id_empleado', 'fecha_hora', 'col_3', 'col_4', 'col_5', 'fecha', 'hora']]
+    
+    except Exception as e:
+        st.error(f"Error al procesar el archivo PDF: {str(e)}")
+        return pd.DataFrame(columns=['id_empleado', 'fecha_hora', 'col_3', 'col_4', 'col_5', 'fecha', 'hora'])
 
 # --- Relación ID <-> Apellido y Nombre ---
 ID_NOMBRE_MAP = {

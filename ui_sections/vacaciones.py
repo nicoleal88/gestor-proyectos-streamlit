@@ -19,8 +19,12 @@ def seccion_vacaciones(client, personal_list):
     if not df_vacaciones.empty:
         df_vacaciones['Fecha inicio'] = pd.to_datetime(df_vacaciones['Fecha inicio'], errors='coerce')
         df_vacaciones['Fecha fin'] = pd.to_datetime(df_vacaciones['Fecha fin'], errors='coerce')
+        # Ajustar la fecha fin para mostrar el último día de vacaciones (un día antes del regreso)
+        df_vacaciones['Último día de vacaciones'] = df_vacaciones['Fecha fin'] - pd.Timedelta(days=1)
+        
         today = pd.to_datetime(datetime.now().date())
-        en_curso = ((df_vacaciones['Fecha inicio'] <= today) & (df_vacaciones['Fecha fin'] >= today)).sum()
+        # Ajustar la lógica para usar el último día de vacaciones en lugar de la fecha de regreso
+        en_curso = ((df_vacaciones['Fecha inicio'] <= today) & (df_vacaciones['Último día de vacaciones'] >= today)).sum()
         proximas = (df_vacaciones['Fecha inicio'] > today).sum()
         col1, col2, col3 = st.columns(3)
         col1.metric("Total Registros", len(df_vacaciones))
@@ -38,26 +42,40 @@ def seccion_vacaciones(client, personal_list):
         def style_status(row):
             today = pd.to_datetime(datetime.now().date()).date()
             start_date = pd.to_datetime(row['Fecha inicio']).date()
-            end_date = pd.to_datetime(row['Fecha fin']).date()
+            last_vacation_day = (pd.to_datetime(row['Fecha fin']) - pd.Timedelta(days=1)).date()
             style = ''
-            if start_date <= today and end_date >= today:
+            if start_date <= today and last_vacation_day >= today:
                 style = 'background-color: lightblue'  # En curso (blue)
-            elif end_date < today:
+            elif last_vacation_day < today:
                 style = 'background-color: lightgray'  # Ya ocurridas (gray)
             elif start_date > today:
-                style = 'background-color: orange'  # Próximas (orange)
+                style = 'background-color: #FFD580'  # Próximas (light orange)
             return [style] * len(row)
 
+        # Crear una copia para mostrar, ajustando las fechas según lo necesario
+        df_display_modified = df_display.copy()
+        # Mostrar la fecha de fin como el último día de vacaciones
+        df_display_modified['Fecha fin'] = df_display_modified['Fecha fin'] - pd.Timedelta(days=1)
+        
         st.dataframe(
-            df_display.style.apply(style_status, axis=1),
+            df_display_modified.style.apply(style_status, axis=1),
             width='stretch',
             hide_index=True,
             column_config={
-                'Fecha inicio': st.column_config.DateColumn(format="DD/MM/YYYY"),
-                'Fecha fin': st.column_config.DateColumn(format="DD/MM/YYYY"),
+                'Fecha inicio': st.column_config.DateColumn(
+                    format="DD/MM/YYYY",
+                    help="Primer día de vacaciones"
+                ),
+                'Fecha fin': st.column_config.DateColumn(
+                    format="DD/MM/YYYY",
+                    help="Último día de vacaciones (el regreso al trabajo es al día siguiente)"
+                ),
                 'Fecha solicitud': st.column_config.DateColumn(format="DD/MM/YYYY")
             }
         )
+        
+        # Agregar nota aclaratoria
+        st.caption("ℹ️ La 'Fecha fin' muestra el último día de vacaciones. El regreso al trabajo es al día siguiente.")
 
     with nueva_licencia:
         with st.form("nueva_vacacion_form", clear_on_submit=True):
@@ -71,7 +89,14 @@ def seccion_vacaciones(client, personal_list):
             if st.form_submit_button("Agregar Registro"):
                 if nombre == "Seleccione persona...":
                     st.warning("Por favor, seleccione una persona.")
+                elif fecha_inicio >= fecha_fin:
+                    st.error("La fecha de inicio debe ser anterior a la fecha de regreso al trabajo.")
                 else:
+                    # Mostrar confirmación con la duración real de las vacaciones
+                    duracion = (fecha_fin - fecha_inicio).days
+                    st.info(f"Se registrarán {duracion} días de vacaciones desde {fecha_inicio.strftime('%d/%m/%Y')} hasta {(fecha_fin - pd.Timedelta(days=1)).strftime('%d/%m/%Y')} (inclusive).")
+                    
+                    # Guardar los datos con la fecha de fin como el día de regreso al trabajo
                     new_row = [nombre, fecha_solicitud.strftime('%Y-%m-%d'), tipo, fecha_inicio.strftime('%Y-%m-%d'), fecha_fin.strftime('%Y-%m-%d'), observaciones]
                     sheet.append_row(new_row)
                     refresh_data(client, sheet_name)

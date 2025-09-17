@@ -132,7 +132,20 @@ def seccion_calendario(client):
             df_vacations['Fecha fin'] = pd.to_datetime(df_vacations['Fecha fin'], errors='coerce')
             for _, row in df_vacations.iterrows():
                 if pd.notna(row['Fecha inicio']) and pd.notna(row['Fecha fin']):
-                    events.append({"title": f"Licencia: {row['Apellido, Nombres']}", "start": row['Fecha inicio'].strftime('%Y-%m-%d'), "end": (row['Fecha fin'] + pd.Timedelta(days=1)).strftime('%Y-%m-%d'), "color": "#1E90FF"})
+                    # Usar la fecha de fin directamente (sin sumar un día) ya que ya es el día de regreso
+                    # y queremos que el evento termine el día anterior
+                    end_date = row['Fecha fin']
+                    events.append({
+                        "title": f"Licencia: {row['Apellido, Nombres']}", 
+                        "start": row['Fecha inicio'].strftime('%Y-%m-%d'), 
+                        "end": end_date.strftime('%Y-%m-%d'), 
+                        "color": "#1E90FF",
+                        "extendedProps": {
+                            "tipo": "vacaciones",
+                            "persona": row['Apellido, Nombres'],
+                            "descripcion": f"Período de licencia de {row['Apellido, Nombres']} desde {row['Fecha inicio'].strftime('%d/%m/%Y')} hasta {end_date.strftime('%d/%m/%Y')}"
+                        }
+                    })
         
         df_compensados = st.session_state.get("df_compensados", pd.DataFrame())
         if not df_compensados.empty:
