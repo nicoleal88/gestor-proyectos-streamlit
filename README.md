@@ -4,84 +4,143 @@ Esta es una aplicación web simple creada con Streamlit que sirve como un fronte
 
 ---
 
+## ✨ Características Principales
+
+- Gestión de personal y tareas
+- Registro de vacaciones con cálculo automático de fechas
+- Control de horas compensadas
+- Sistema de notas y recordatorios
+- Calendario integrado con visualización de eventos
+- Autenticación de usuarios con roles de administrador, empleado e invitado
+- Integración con Google Sheets para almacenamiento de datos
+- Visualización de datos con gráficos interactivos
+
 ## 🚀 Cómo Ejecutar la Aplicación
 
-### 1. Requisitos Previos
+## 📋 Requisitos Previos
 
-- Python 3.7 o superior.
-- Una cuenta de Google.
+- Python 3.7 o superior
+- Una cuenta de Google
+- Acceso a Google Cloud Console
 
-### 2. Instalación
+## 🛠️ Instalación
 
-```bash
-pip install -r requirements.txt
-```
+1. Clona el repositorio:
 
-### 3. Configuración de las Credenciales de Google Sheets
+   ```bash
+   git clone [URL_DEL_REPOSITORIO]
+   cd gestor_proyectos_streamlit
+   ```
 
-Esta es la parte más importante. La aplicación necesita acceso a tu Google Drive y Google Sheets a través de una **Cuenta de Servicio (Service Account)**.
+2. Crea y activa un entorno virtual (recomendado):
 
-**Paso 1: Habilitar las APIs**
+   ```bash
+   python -m venv venv
+   source venv/bin/activate  # En Windows: venv\Scripts\activate
+   ```
 
-1.  Ve a la [Consola de Google Cloud](https://console.cloud.google.com/).
-2.  Crea un nuevo proyecto o selecciona uno existente.
-3.  En el buscador, busca y habilita las siguientes dos APIs:
-    *   **Google Drive API**
-    *   **Google Sheets API**
+3. Instala las dependencias:
 
-**Paso 2: Crear la Cuenta de Servicio**
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-1.  En el menú de navegación de la izquierda, ve a `IAM y administración` > `Cuentas de servicio`.
-2.  Haz clic en `+ CREAR CUENTA DE SERVICIO`.
-3.  Dale un nombre (ej. "gestor-proyectos-streamlit") y una descripción. Haz clic en `CREAR Y CONTINUAR`.
-4.  En el paso de "roles", no es necesario añadir ninguno. Haz clic en `CONTINUAR`.
-5.  En el último paso, haz clic en `HECHO`.
+## 🔑 Configuración de Google Sheets
 
-**Paso 3: Generar la Clave JSON**
+### 1. Habilitar las APIs de Google
 
-1.  En la lista de cuentas de servicio, busca la que acabas de crear. Haz clic en los tres puntos bajo "Acciones" y selecciona `Administrar claves`.
-2.  Haz clic en `AGREGAR CLAVE` > `Crear nueva clave`.
-3.  Selecciona `JSON` como tipo de clave y haz clic en `CREAR`.
-4.  Se descargará un archivo JSON. **Este archivo es tu credencial.**
+- Ve a la [Consola de Google Cloud](https://console.cloud.google.com/)
+- Crea un nuevo proyecto o selecciona uno existente
+- Habilita las siguientes APIs:
+  - Google Drive API
+  - Google Sheets API
 
-**Paso 4: Mover y Renombrar la Clave**
+### 2. Crear una Cuenta de Servicio
 
-1.  Busca el archivo JSON que descargaste.
-2.  Muévelo a la raíz de este proyecto (la misma carpeta donde está `app.py`).
-3.  **Renombra el archivo a `credenciales.json`**.
+1. Navega a `IAM y administración` > `Cuentas de servicio`
+2. Haz clic en `+ CREAR CUENTA DE SERVICIO`
+3. Completa la información solicitada y haz clic en `CREAR Y CONTINUAR`
+4. Haz clic en `CONTINUAR` sin asignar roles
+5. Haz clic en `HECHO`
 
-**Paso 5: Crear y Compartir el Google Sheet**
+### 3. Generar y Configurar las Credenciales
 
-1.  Ve a [Google Sheets](https://sheets.google.com) y crea una nueva hoja de cálculo.
-2.  **Renómbrala a `GestorProyectosStreamlit`**. El nombre debe ser exacto.
-3.  Abre tu archivo `credenciales.json` con un editor de texto. Busca el valor asociado a la clave `"client_email"`. Será algo como `nombre-cuenta@...gserviceaccount.com`. Cópialo.
-4.  Vuelve a tu Google Sheet, haz clic en el botón `Compartir` (arriba a la derecha).
-5.  Pega el email de la cuenta de servicio en el campo de texto, asegúrate de que tenga el rol de **Editor**, y haz clic en `Compartir`.
+1. En la lista de cuentas de servicio, busca la que acabas de crear
+2. Haz clic en los tres puntos y selecciona `Administrar claves`
+3. Haz clic en `AGREGAR CLAVE` > `Crear nueva clave`
+4. Selecciona `JSON` y haz clic en `CREAR`
+5. Mueve el archivo descargado a la raíz del proyecto y renómbralo a `credenciales.json`
+
+### 4. Configurar la Hoja de Cálculo
+
+1. Crea una nueva hoja de cálculo en [Google Sheets](https://sheets.google.com)
+2. Nómbrala `GestorProyectosStreamlit`
+3. Comparte la hoja con el email de la cuenta de servicio (encontrado en `credenciales.json` como `client_email`)
+4. Asegúrate de dar permisos de **Editor**
 
 ### 4. Configurar las Pestañas y Columnas del Google Sheet
 
 Dentro de tu Google Sheet `GestorProyectosStreamlit`, crea **7 pestañas**. Asegúrate de que la primera fila de cada pestaña contenga exactamente los siguientes encabezados:
 
--   **Pestaña `Personal`**
-    -   `Apellido, Nombres`
+### Estructura de la Hoja de Cálculo
 
--   **Pestaña `Tareas`**
-    -   `ID`, `Título Tarea`, `Tarea`, `Responsable`, `Fecha límite`, `Estado`
+La aplicación espera que la hoja de cálculo de Google Sheets contenga las siguientes pestañas con sus respectivas columnas:
 
--   **Pestaña `Comentarios`**
-    -   `ID_Tarea`, `Fecha`, `Comentario`
+#### Pestaña `Personal`
 
--   **Pestaña `Vacaciones`**
-    -   `Apellido, Nombres`, `Fecha solicitud`, `Tipo`, `Fecha inicio`, `Fecha fin`, `Observaciones`
+- `Apellido, Nombres`
 
--   **Pestaña `Compensados`**
-    -   `Apellido, Nombre`, `Fecha Solicitud`, `Tipo`, `Desde fecha`, `Desde hora`, `Hasta fecha`, `Hasta hora`
+#### Pestaña `Tareas`
 
--   **Pestaña `Notas`**
-    -   `Fecha`, `Remitente`, `DNI`, `Teléfono`, `Motivo`, `Responsable`, `Estado`
+- `ID`
+- `Título Tarea`
+- `Tarea`
+- `Responsable`
+- `Fecha límite`
+- `Estado`
 
--   **Pestaña `Recordatorios`**
-    -   `Fecha`, `Mensaje`, `Responsable`
+#### Pestaña `Comentarios`
+
+- `ID_Tarea`
+- `Fecha`
+- `Comentario`
+
+#### Pestaña `Vacaciones`
+
+- `Apellido, Nombres`
+- `Fecha solicitud`
+- `Tipo`
+- `Fecha inicio`
+- `Fecha regreso`
+- `Observaciones`
+
+> **Nota:** La fecha de regreso es el día en que la persona vuelve al trabajo. Las vacaciones terminan el día anterior a la fecha de regreso.
+
+#### Pestaña `Compensados`
+
+- `Apellido, Nombre`
+- `Fecha Solicitud`
+- `Tipo`
+- `Desde fecha`
+- `Desde hora`
+- `Hasta fecha`
+- `Hasta hora`
+
+#### Pestaña `Notas`
+
+- `Fecha`
+- `Remitente`
+- `DNI`
+- `Teléfono`
+- `Motivo`
+- `Responsable`
+- `Estado`
+
+#### Pestaña `Recordatorios`
+
+- `Fecha`
+- `Mensaje`
+- `Responsable`
 
 ### 5. Ejecutar la Aplicación
 
