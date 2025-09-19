@@ -617,7 +617,114 @@ def seccion_horarios(client, personal_list):
         # --- Análisis y Gráficos ---
         st.subheader("Análisis de Horas Trabajadas")
 
-        if empleado_seleccionado != 'Todos':
+        if empleado_seleccionado == 'Todos':
+            # --- Vista general para todos los empleados ---
+            st.subheader("Resumen General del Personal")
+            
+            # Calcular métricas generales
+            total_empleados = len(df_jornada_filtrada['id_empleado'].unique())
+            total_dias = len(df_jornada_filtrada['fecha'].unique())
+            horas_promedio = df_jornada_filtrada['duracion_horas'].mean()
+            
+            # Mostrar métricas generales
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("Total de Empleados", total_empleados)
+            with col2:
+                st.metric("Días analizados", total_dias)
+            with col3:
+                st.metric("Horas promedio por día", f"{horas_promedio:.1f} hs")
+            
+            # --- Tabla resumen por empleado ---
+            st.subheader("Resumen por Empleado")
+            
+            # Calcular métricas por empleado
+            resumen_empleados = df_jornada_filtrada.groupby(['id_empleado', 'nombre']).agg(
+                dias_trabajados=('fecha', 'nunique'),
+                horas_totales=('duracion_horas', 'sum'),
+                horas_promedio=('duracion_horas', 'mean'),
+                jornada_mas_larga=('duracion_horas', 'max'),
+                jornada_mas_corta=('duracion_horas', 'min')
+            ).reset_index()
+            
+            # Ordenar por nombre de empleado
+            resumen_empleados = resumen_empleados.sort_values('nombre')
+            
+            # Formatear las columnas
+            resumen_empleados['horas_promedio'] = resumen_empleados['horas_promedio'].round(2)
+            resumen_empleados['horas_totales'] = resumen_empleados['horas_totales'].round(2)
+            
+            # Mostrar la tabla con estilos condicionales
+            def color_jornada(val):
+                if val < 7.5:
+                    return 'color: #e74c3c'  # Rojo para menos de 7.5 horas
+                elif val > 8.5:
+                    return 'color: #f39c12'   # Naranja para más de 8.5 horas
+                else:
+                    return 'color: #2ecc71'   # Verde para entre 7.5 y 8.5 horas
+            
+            # Aplicar estilos a la tabla
+            styled_df = resumen_empleados.style.applymap(
+                color_jornada, 
+                subset=['horas_promedio', 'jornada_mas_larga', 'jornada_mas_corta']
+            ).format({
+                'horas_promedio': '{:.2f} hs',
+                'horas_totales': '{:.2f} hs',
+                'jornada_mas_larga': '{:.2f} hs',
+                'jornada_mas_corta': '{:.2f} hs',
+            })
+            
+            # Mostrar la tabla con scroll
+            st.dataframe(
+                styled_df,
+                column_config={
+                    'id_empleado': 'ID',
+                    'nombre': 'Empleado',
+                    'dias_trabajados': 'Días Trabajados',
+                    'horas_totales': 'Horas Totales',
+                    'horas_promedio': 'Horas Promedio',
+                    'jornada_mas_larga': 'Jornada Más Larga',
+                    'jornada_mas_corta': 'Jornada Más Corta'
+                },
+                use_container_width=True,
+                height=min(400, 100 + len(resumen_empleados) * 35)
+            )
+            
+            # --- Gráfico de distribución de horas ---
+            st.subheader("Distribución de Horas por Día")
+            
+            # Crear gráfico de cajas por empleado
+            fig_distribucion = px.box(
+                df_jornada_filtrada,
+                x='nombre',
+                y='duracion_horas',
+                color='nombre',
+                labels={'duracion_horas': 'Horas trabajadas', 'nombre': 'Empleado'},
+                title='Distribución de horas trabajadas por empleado',
+                template='plotly_white'
+            )
+            
+            # Añadir línea de referencia de 8 horas
+            fig_distribucion.add_hline(
+                y=8,
+                line_dash="dash",
+                line_color="red",
+                annotation_text="8 hs ideales",
+                annotation_position="top right"
+            )
+            
+            # Ajustar diseño del gráfico
+            fig_distribucion.update_layout(
+                showlegend=False,
+                xaxis_title=None,
+                yaxis_title='Horas trabajadas',
+                height=500,
+                margin=dict(l=20, r=20, t=40, b=20)
+            )
+            
+            st.plotly_chart(fig_distribucion, use_container_width=True)
+            
+        else:
             st.subheader(f"Horas trabajadas por día - {ID_NOMBRE_MAP.get(empleado_seleccionado, empleado_seleccionado)}")
             
             if not df_jornada_filtrada.empty:
@@ -1085,10 +1192,10 @@ def seccion_horarios(client, personal_list):
                                     "</div>",
                                     unsafe_allow_html=True
                                 )
-        else:
-            # --- Mostrar los DataFrames completos al final de la página ---
-            st.header("Datos completos")
-            st.subheader("Registros originales")
-            st.dataframe(df_registros)
-            st.subheader("Jornadas calculadas")
-            st.dataframe(jornada)
+            # --- Mostrar los DataFrames completos al final de la página (solo en modo desarrollador) ---
+            if st.checkbox("Mostrar datos completos (modo desarrollador)"):
+                st.header("Datos completos")
+                st.subheader("Registros originales")
+                st.dataframe(df_registros)
+                st.subheader("Jornadas calculadas")
+                st.dataframe(jornada)
