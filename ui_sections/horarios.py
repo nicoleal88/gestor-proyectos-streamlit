@@ -4,6 +4,8 @@ import plotly.express as px
 import pdfplumber
 import warnings
 import re
+from datetime import datetime, timedelta
+from datetime import datetime, timedelta
 
 warnings.filterwarnings("ignore", message=".*FontBBox.*")
 
@@ -273,6 +275,78 @@ def leer_excel_horarios(archivo_excel):
         df_planilla['hora'] = df_planilla['fecha_hora'].dt.hour
     return df_planilla
 
+
+def obtener_compensatorios_por_fecha():
+    """
+    Obtiene los compensatorios activos del session_state y los procesa para el análisis de horarios.
+    Solo incluye compensatorios con horas de inicio y fin definidas.
+    Devuelve un DataFrame con los compensatorios por fecha y empleado.
+    """
+    if 'df_compensados' not in st.session_state or st.session_state.df_compensados.empty:
+        return pd.DataFrame()
+    
+    try:
+        # Obtener datos de compensatorios
+        compensados = st.session_state.df_compensados.copy()
+        
+        # Verificar si las columnas necesarias existen
+        required_columns = ['Apellido, Nombres', 'Desde fecha', 'Hasta fecha', 'Desde hora', 'Hasta hora']
+        if not all(col in compensados.columns for col in required_columns):
+            st.warning("El formato de la hoja de compensatorios no es el esperado")
+            return pd.DataFrame()
+        
+        # Convertir fechas y horas
+        compensados['Desde fecha'] = pd.to_datetime(compensados['Desde fecha']).dt.date
+        compensados['Hasta fecha'] = pd.to_datetime(compensados['Hasta fecha']).dt.date
+        
+        # Filtrar solo compensatorios con horas de inicio y fin definidas
+        compensados = compensados[
+            compensados['Desde hora'].notna() &
+            compensados['Hasta hora'].notna() &
+            (compensados['Desde hora'] != '') &
+            (compensados['Hasta hora'] != '')
+        ]
+        
+        if compensados.empty:
+            return pd.DataFrame()
+            
+        # Procesar cada registro de compensatorio
+        registros = []
+        for _, row in compensados.iterrows():
+            try:
+                # Obtener la duración en horas
+                hora_inicio = pd.to_datetime(row['Desde hora']).time()
+                hora_fin = pd.to_datetime(row['Hasta hora']).time()
+                
+                # Calcular duración en horas
+                inicio_dt = datetime.combine(datetime.today(), hora_inicio)
+                fin_dt = datetime.combine(datetime.today(), hora_fin)
+                duracion = (fin_dt - inicio_dt).total_seconds() / 3600  # Convertir a horas
+                
+                # Obtener ID del empleado desde el nombre (asumiendo que está en el formato 'Apellido, Nombre')
+                nombre_empleado = row['Apellido, Nombres']
+                id_empleado = next((k for k, v in ID_NOMBRE_MAP.items() if v == nombre_empleado), None)
+                
+                if id_empleado:
+                    registros.append({
+                        'fecha': row['Desde fecha'],
+                        'fecha_dt': pd.Timestamp(row['Desde fecha']),
+                        'id_empleado': id_empleado,
+                    'tipo': 'COMPENSATORIO',
+                    'duracion_horas': duracion,
+                    'fecha_formateada': row['Desde fecha'].strftime('%a %d-%b-%Y'),
+                    'hora_inicio': hora_inicio.strftime('%H:%M'),
+                    'hora_fin': hora_fin.strftime('%H:%M')
+                })
+            except Exception as e:
+                st.warning(f"Error al procesar compensatorio para {row.get('Apellido, Nombres', 'empleado')}: {str(e)}")
+                continue
+                
+        return pd.DataFrame(registros)
+        
+    except Exception as e:
+        st.error(f"Error al procesar compensatorios: {str(e)}")
+        return pd.DataFrame()
 
 # --- Relación ID <-> Apellido y Nombre ---
 ID_NOMBRE_MAP = {
@@ -715,11 +789,37 @@ def seccion_horarios(client, personal_list):
             
             # Ajustar diseño del gráfico
             fig_distribucion.update_layout(
-                showlegend=False,
+                showlegend=True,
+                legend=dict(
+                    orientation="h",
+                    yanchor="bottom",
+                    y=-0.6,  # Posición vertical de la leyenda (negativo para moverla abajo)
+                    xanchor="center",
+                    x=0.5,   # Centrar la leyenda horizontalmente
+                    title=None,
+                    font=dict(size=10)  # Tamaño de fuente más pequeño para la leyenda
+                ),
                 xaxis_title=None,
                 yaxis_title='Horas trabajadas',
-                height=500,
-                margin=dict(l=20, r=20, t=40, b=20)
+                height=600,  # Aumentar la altura para acomodar la leyenda
+                margin=dict(l=20, r=20, t=40, b=100),  # Aumentar margen inferior para la leyenda
+                boxmode='group',
+                boxgap=0.2,
+                boxgroupgap=0.3
+            )
+            
+            # Configurar para mostrar solo los boxplots sin puntos y con mejor ancho
+            fig_distribucion.update_traces(
+                boxpoints=False,  # No mostrar puntos individuales
+                showlegend=True,
+                width=0.6,       # Ancho de los boxplots
+                line=dict(width=1.5)  # Grosor del borde de los boxplots
+            )
+            
+            # Asegurar que el gráfico sea interactivo
+            fig_distribucion.update_layout(
+                hovermode='closest',
+                clickmode='event+select'
             )
             
             st.plotly_chart(fig_distribucion, use_container_width=True)
@@ -743,16 +843,27 @@ def seccion_horarios(client, personal_list):
                     lambda x: f"{dias_semana[x.weekday()]} {x.strftime('%d-%b-%Y')}"
                 )
                 
+                # Obtener datos de compensatorios para el empleado
+                df_compensatorios = obtener_compensatorios_por_fecha()
+                if not df_compensatorios.empty and empleado_seleccionado != 'Todos':
+                    df_compensatorios = df_compensatorios[df_compensatorios['id_empleado'] == empleado_seleccionado]
+                
                 # Asegurarse de que tenemos la columna 'tipo' correcta (puede ser 'tipo_x' o 'tipo_y')
                 tipo_col = 'tipo_x' if 'tipo_x' in df_plot.columns else 'tipo_y' if 'tipo_y' in df_plot.columns else 'tipo'
                 
                 # Asegurarse de que los tipos sean consistentes
                 df_plot[tipo_col] = df_plot[tipo_col].replace({'LIBRO': 'LIBRO', 'RELOJ': 'RELOJ'})
                 
-                # Asegurarse de que tenemos datos para ambos tipos (LIBRO y RELOJ) para cada fecha
-                # Crear un DataFrame con todas las combinaciones de fechas y tipos
+                # Asegurarse de que tenemos datos para todos los tipos (LIBRO, RELOJ y COMPENSATORIO) para cada fecha
                 from itertools import product
                 fechas_unicas = df_plot['fecha'].unique()
+                
+                # Si hay compensatorios, añadir sus fechas únicas
+                if not df_compensatorios.empty:
+                    fechas_compensatorios = df_compensatorios['fecha'].unique()
+                    fechas_unicas = pd.unique(list(fechas_unicas) + list(fechas_compensatorios))
+                
+                # Definir los tipos de registro
                 tipos = ['LIBRO', 'RELOJ']
                 
                 # Crear un DataFrame con todas las combinaciones posibles
@@ -767,6 +878,29 @@ def seccion_horarios(client, personal_list):
                 
                 # Rellenar valores faltantes con 0
                 df_completo['duracion_horas'] = df_completo['duracion_horas'].fillna(0)
+                
+                # Combinar datos de horarios y compensatorios
+                if not df_compensatorios.empty:
+                    # Preparar datos de compensatorios para el merge
+                    df_compensatorios_plot = df_compensatorios.rename(columns={
+                        'tipo': 'tipo_combinado',
+                        'fecha_dt': 'fecha_dt',
+                        'fecha_formateada': 'fecha_formateada'
+                    })
+                    
+                    # Añadir columnas faltantes
+                    for col in ['inicio_jornada', 'fin_jornada', 'minutos_trabajados', 'hora_entrada', 'hora_salida']:
+                        if col not in df_compensatorios_plot.columns:
+                            df_compensatorios_plot[col] = None
+                    
+                    # Combinar con datos existentes
+                    df_completo = pd.concat([
+                        df_completo,
+                        df_compensatorios_plot[df_completo.columns.intersection(df_compensatorios_plot.columns)]
+                    ], ignore_index=True)
+                
+                # Ordenar por fecha y tipo
+                df_completo = df_completo.sort_values(['fecha', 'tipo_combinado'])
                 
                 # Crear el gráfico de barras agrupado
                 fig_historial = px.bar(
@@ -783,11 +917,12 @@ def seccion_horarios(client, personal_list):
                     },
                     color_discrete_map={
                         'LIBRO': '#1f77b4',  # Azul para LIBRO
-                        'RELOJ': '#ff7f0e'   # Naranja para RELOJ
+                        'RELOJ': '#ff7f0e',  # Naranja para RELOJ
+                        'COMPENSATORIO': '#2ecc71'  # Verde para COMPENSATORIO
                     },
                     category_orders={
                         'fecha': sorted(df_completo['fecha'].unique()),
-                        'tipo_combinado': ["LIBRO", "RELOJ"]
+                        'tipo_combinado': ["LIBRO", "RELOJ", "COMPENSATORIO"]
                     },
                     template='plotly_white',
                     custom_data=['fecha_formateada', 'tipo_combinado']
