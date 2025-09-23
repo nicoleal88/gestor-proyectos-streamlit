@@ -738,7 +738,7 @@ def seccion_horarios(client, personal_list):
                     return 'color: #2ecc71'   # Verde para entre 7.5 y 8.5 horas
             
             # Aplicar estilos a la tabla
-            styled_df = resumen_empleados.style.applymap(
+            styled_df = resumen_empleados.style.map(
                 color_jornada, 
                 subset=['horas_promedio', 'jornada_mas_larga', 'jornada_mas_corta']
             ).format({
@@ -760,7 +760,7 @@ def seccion_horarios(client, personal_list):
                     'jornada_mas_larga': 'Jornada Más Larga',
                     'jornada_mas_corta': 'Jornada Más Corta'
                 },
-                use_container_width=True,
+                width='stretch',
                 height=min(400, 100 + len(resumen_empleados) * 35)
             )
             
