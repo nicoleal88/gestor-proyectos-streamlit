@@ -122,9 +122,20 @@ def seccion_calendario(client):
         df_tasks = st.session_state.get("df_tareas", pd.DataFrame())
         if not df_tasks.empty:
             df_tasks['Fecha límite'] = pd.to_datetime(df_tasks['Fecha límite'], errors='coerce')
-            for _, row in df_tasks.iterrows():
+            # Filtrar para excluir tareas con estado "Finalizada"
+            df_active_tasks = df_tasks[df_tasks['Estado'] != 'Finalizada']
+            for _, row in df_active_tasks.iterrows():
                 if pd.notna(row['Fecha límite']):
-                    events.append({"title": f"Tarea: {row['Título Tarea']}", "start": row['Fecha límite'].strftime('%Y-%m-%d'), "color": "#FF6347"})
+                    events.append({
+                        "title": f"Tarea: {row['Título Tarea']}", 
+                        "start": row['Fecha límite'].strftime('%Y-%m-%d'), 
+                        "color": "#FF6347",
+                        "extendedProps": {
+                            "tipo": "tarea",
+                            "estado": row.get('Estado', 'Pendiente'),
+                            "responsable": row.get('Responsable', 'No asignado')
+                        }
+                    })
         
         df_vacations = st.session_state.get("df_vacaciones", pd.DataFrame())
         if not df_vacations.empty:
