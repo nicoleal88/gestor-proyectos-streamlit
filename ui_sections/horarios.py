@@ -456,42 +456,95 @@ def seccion_horarios(client, personal_list):
     # st.markdown("Carga tus archivos de texto y PDF para visualizar tendencias y patrones de asistencia.")
 
     # Widgets para subir archivos
-    col1, col2 ,col3 = st.columns(3)
+    st.markdown("### Opción 1: Cargar archivos individuales")
+    col1, col2, col3 = st.columns(3)
     archivo_subido = col1.file_uploader(
         "Registros de Estación Central (.txt, .csv)",
-        type=['txt', 'csv']
+        type=['txt', 'csv'],
+        key='estacion_central'
     )
     archivo_pdf = col2.file_uploader(
         "Registros de SDECo (.pdf)",
-        type=['pdf']
+        type=['pdf'],
+        key='sdeco_pdf'
     )
     archivo_excel = col3.file_uploader(
         "Registros de Planilla (.xlsx)",
-        type=['xlsx']
+        type=['xlsx'],
+        key='planilla_excel'
     )
+    
+    # Opción para cargar CSV exportado previamente
+    st.markdown("### O bien")
+    st.markdown("### Opción 2: Cargar archivo CSV exportado")
+    archivos_csv = st.file_uploader(
+        "Cargar archivo CSV exportado (puede seleccionar varios)",
+        type=['csv'],
+        accept_multiple_files=True,
+        key='csv_exportado'
+    )
+    
     df_registros = None
 
     # --- Carga y combinación de archivos ---
-    if archivo_subido is not None:
-        df_registros, _ = cargar_y_procesar_datos(archivo_subido)
+    # Primero manejamos los archivos individuales
+    if archivo_subido is not None or archivo_pdf is not None or archivo_excel is not None:
+        if archivo_subido is not None:
+            df_registros, _ = cargar_y_procesar_datos(archivo_subido)
 
-    if archivo_pdf is not None:
-        import tempfile
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
-            tmp.write(archivo_pdf.read())
-            tmp_path = tmp.name
-        df_pdf = leer_pdf_query(tmp_path)
-        if df_registros is not None:
-            df_registros = pd.concat([df_registros, df_pdf], ignore_index=True)
-        else:
-            df_registros = df_pdf
+        if archivo_pdf is not None:
+            import tempfile
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+                tmp.write(archivo_pdf.read())
+                tmp_path = tmp.name
+            df_pdf = leer_pdf_query(tmp_path)
+            if df_registros is not None:
+                df_registros = pd.concat([df_registros, df_pdf], ignore_index=True)
+            else:
+                df_registros = df_pdf
 
-    if archivo_excel is not None:
-        df_excel = leer_excel_horarios(archivo_excel)
-        if df_registros is not None:
-            df_registros = pd.concat([df_registros, df_excel], ignore_index=True)
-        else:
-            df_registros = df_excel
+        if archivo_excel is not None:
+            df_excel = leer_excel_horarios(archivo_excel)
+            if df_registros is not None:
+                df_registros = pd.concat([df_registros, df_excel], ignore_index=True)
+            else:
+                df_registros = df_excel
+    
+    # Luego manejamos los archivos CSV (si se cargaron)
+    elif archivos_csv and len(archivos_csv) > 0:
+        dfs_csv = []
+        for archivo_csv in archivos_csv:
+            try:
+                # Leer el archivo CSV
+                df_temp = pd.read_csv(archivo_csv)
+                
+                # Verificar si tiene las columnas necesarias
+                columnas_requeridas = ['id_empleado', 'fecha_hora', 'tipo']
+                if all(col in df_temp.columns for col in columnas_requeridas):
+                    # Convertir fecha_hora a datetime si es necesario
+                    if not pd.api.types.is_datetime64_any_dtype(df_temp['fecha_hora']):
+                        df_temp['fecha_hora'] = pd.to_datetime(df_temp['fecha_hora'])
+                    
+                    # Asegurarse de que id_empleado sea string
+                    df_temp['id_empleado'] = df_temp['id_empleado'].astype(str)
+                    
+                    # Extraer fecha de fecha_hora si no existe
+                    if 'fecha' not in df_temp.columns:
+                        df_temp['fecha'] = df_temp['fecha_hora'].dt.date
+                    
+                    dfs_csv.append(df_temp)
+                else:
+                    st.warning(f"El archivo {archivo_csv.name} no tiene el formato esperado. Se omitirá.")
+            except Exception as e:
+                st.error(f"Error al procesar el archivo {archivo_csv.name}: {str(e)}")
+        
+        if dfs_csv:
+            df_registros = pd.concat(dfs_csv, ignore_index=True)
+            # No mostramos el mensaje de éxito, solo mantenemos el conteo en el estado de la sesión
+            st.session_state['csv_loaded'] = {
+                'count': len(dfs_csv),
+                'total_records': len(df_registros)
+            }
 
     if df_registros is not None and not df_registros.empty:
         # Separar los DataFrames por tipo
@@ -577,7 +630,34 @@ def seccion_horarios(client, personal_list):
             lambda x: get_employee_display(x, st.session_state.get('incognito_mode', False))
         )
 
-        st.success("¡Archivos cargados y combinados con éxito!")
+        # Mostrar mensaje de éxito y botón de descarga
+        col1, col2 = st.columns([1, 2])
+        with col1:
+            st.success("¡Archivos cargados y combinados con éxito!")
+        with col2:
+            # Crear un dataframe para la descarga (copiamos para no modificar el original)
+            df_descarga = df_registros.copy()
+            # Obtener el mes y año de los datos (usamos el primer registro como referencia)
+            if not df_descarga.empty and 'fecha' in df_descarga.columns:
+                fecha_ejemplo = pd.to_datetime(df_descarga['fecha'].iloc[0])
+                periodo = fecha_ejemplo.strftime('%Y-%m')
+            else:
+                periodo = 'sin_fecha'
+            
+            # Generar timestamp actual
+            timestamp = pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')
+            
+            # Convertir a CSV
+            csv = df_descarga.to_csv(index=False, encoding='utf-8-sig')
+            
+            # Crear botón de descarga
+            st.download_button(
+                label="📥 Descargar datos completos (CSV)",
+                data=csv,
+                file_name=f"datos_horarios_{periodo}_{timestamp}.csv",
+                mime='text/csv',
+                help="Descarga los datos completos de horarios en formato CSV"
+            )
 
         # # --- Comparación de Horarios Libro vs Reloj ---
         # if 'tipo' in df_registros.columns and len(df_registros['tipo'].unique()) > 1:
@@ -792,8 +872,9 @@ def seccion_horarios(client, personal_list):
                 y='duracion_horas',
                 color='nombre',
                 labels={'duracion_horas': 'Horas trabajadas', 'nombre': 'Empleado'},
-                title='Distribución de horas trabajadas por empleado',
-                template='plotly_white'
+                title=f"Distribución de horas trabajadas por empleado ({pd.to_datetime(mes_seleccionado).strftime('%B %Y').title()})" if mes_seleccionado != 'Todos' else 'Distribución de horas trabajadas por empleado',
+                template='plotly_white',
+                range_y=[0, 16]  # Establecer rango del eje Y entre 0 y 16 horas
             )
             
             # Añadir línea de referencia de 8 horas
