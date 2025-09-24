@@ -434,6 +434,12 @@ MAPA_PLANILLA_ID = {
     "RIOS": None
 }
 
+def get_employee_display(id_empleado, incognito_mode):
+    """Devuelve el nombre o ID del empleado según el modo incógnito"""
+    if incognito_mode:
+        return f"ID: {id_empleado}"
+    return ID_NOMBRE_MAP.get(id_empleado, f"ID: {id_empleado}")
+
 def seccion_horarios(client, personal_list):
     """
     Sección de Streamlit para analizar y visualizar los horarios del personal.
@@ -442,6 +448,11 @@ def seccion_horarios(client, personal_list):
 
     # --- Interfaz de Usuario (UI) ---
     st.subheader("📊 Analizador de Horarios del Personal")
+    
+    # Toggle para modo incógnito
+    incognito_mode = st.checkbox("Modo incógnito (mostrar IDs en lugar de nombres)", 
+                               value=st.session_state.get('incognito_mode', False),
+                               key='incognito_mode')
     # st.markdown("Carga tus archivos de texto y PDF para visualizar tendencias y patrones de asistencia.")
 
     # Widgets para subir archivos
@@ -559,8 +570,12 @@ def seccion_horarios(client, personal_list):
         jornada = jornada[jornada['duracion_horas'] > 0.25]
 
         # Añadir columna de nombre completo según ID
-        df_registros['nombre'] = df_registros['id_empleado'].map(ID_NOMBRE_MAP).fillna(df_registros['id_empleado'])
-        jornada['nombre'] = jornada['id_empleado'].map(ID_NOMBRE_MAP).fillna(jornada['id_empleado'])
+        df_registros['nombre'] = df_registros['id_empleado'].apply(
+            lambda x: get_employee_display(x, st.session_state.get('incognito_mode', False))
+        )
+        jornada['nombre'] = jornada['id_empleado'].apply(
+            lambda x: get_employee_display(x, st.session_state.get('incognito_mode', False))
+        )
 
         st.success("¡Archivos cargados y combinados con éxito!")
 
@@ -663,7 +678,10 @@ def seccion_horarios(client, personal_list):
         empleado_seleccionado = col3.selectbox(
             "Selecciona un Empleado:",
             options=lista_empleados,
-            format_func=lambda x: f"{ID_NOMBRE_MAP[x]} (ID: {x})" if x in ID_NOMBRE_MAP else (x if x == 'Todos' else f"ID: {x}")
+            format_func=lambda x: (
+                f"{get_employee_display(x, st.session_state.get('incognito_mode', False))}" 
+                if x != 'Todos' else x
+            )
         )
 
         df_registros['año_mes'] = pd.to_datetime(df_registros['fecha_hora']).dt.to_period('M')
@@ -825,7 +843,8 @@ def seccion_horarios(client, personal_list):
             st.plotly_chart(fig_distribucion, use_container_width=True)
             
         else:
-            st.subheader(f"Horas trabajadas por día - {ID_NOMBRE_MAP.get(empleado_seleccionado, empleado_seleccionado)}")
+            display_name = get_employee_display(empleado_seleccionado, st.session_state.get('incognito_mode', False))
+            st.subheader(f"Horas trabajadas por día - {display_name}")
             
             if not df_jornada_filtrada.empty:
                 # Crear una copia para no modificar el DataFrame original
