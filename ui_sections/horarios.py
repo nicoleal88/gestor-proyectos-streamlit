@@ -4,7 +4,7 @@ import plotly.express as px
 import pdfplumber
 import warnings
 import re
-from datetime import datetime, timedelta
+import numpy as np
 from datetime import datetime, timedelta
 
 warnings.filterwarnings("ignore", message=".*FontBBox.*")
@@ -1002,9 +1002,40 @@ def seccion_horarios(client, personal_list):
                 # Ordenar por fecha y tipo
                 df_completo = df_completo.sort_values(['fecha', 'tipo_combinado'])
                 
+                # Identificar días con salida a campo (2 registros de reloj y más de 6 horas trabajadas)
+                if empleado_seleccionado != 'Todos':
+                    # Crear un DataFrame con los registros de reloj del empleado seleccionado
+                    df_reloj_empleado = df_registros[
+                        (df_registros['id_empleado'] == empleado_seleccionado) & 
+                        (df_registros['tipo'] == 'RELOJ')
+                    ].copy()
+                    
+                    # Contar registros por fecha
+                    registros_por_dia = df_reloj_empleado.groupby('fecha').size()
+                    
+                    # Obtener horas trabajadas por día desde df_jornada_filtrada
+                    horas_por_dia = df_jornada_filtrada[['fecha', 'duracion_horas']].drop_duplicates()
+                    
+                    # Identificar días con salida a campo
+                    dias_salida_campo = []
+                    for fecha, conteo in registros_por_dia.items():
+                        if conteo == 2:  # Solo considerar días con exactamente 2 registros
+                            # Obtener las horas trabajadas para este día
+                            horas_dia = horas_por_dia[horas_por_dia['fecha'] == fecha]['duracion_horas']
+                            if not horas_dia.empty and float(horas_dia.iloc[0]) > 7:  # Más de 7 horas trabajadas
+                                dias_salida_campo.append(fecha)
+                    
+                    # Añadir columna para resaltar en el gráfico
+                    df_completo['es_salida_campo'] = df_completo['fecha'].isin(dias_salida_campo)
+                else:
+                    df_completo['es_salida_campo'] = False
+                
+                # Crear una copia del DataFrame para no modificar el original
+                df_plot = df_completo.copy()
+                
                 # Crear el gráfico de barras agrupado
                 fig_historial = px.bar(
-                    df_completo,
+                    df_plot,
                     x='fecha',
                     y='duracion_horas',
                     color='tipo_combinado',
@@ -1018,15 +1049,38 @@ def seccion_horarios(client, personal_list):
                     color_discrete_map={
                         'LIBRO': '#1f77b4',  # Azul para LIBRO
                         'RELOJ': '#ff7f0e',  # Naranja para RELOJ
-                        'COMPENSATORIO': '#2ecc71'  # Verde para COMPENSATORIO
+                        'COMPENSATORIO': '#9b59b6'  # Violeta para COMPENSATORIO
                     },
                     category_orders={
-                        'fecha': sorted(df_completo['fecha'].unique()),
+                        'fecha': sorted(df_plot['fecha'].unique()),
                         'tipo_combinado': ["LIBRO", "RELOJ", "COMPENSATORIO"]
                     },
                     template='plotly_white',
-                    custom_data=['fecha_formateada', 'tipo_combinado']
+                    custom_data=['fecha_formateada', 'tipo_combinado', 'es_salida_campo']
                 )
+                
+                # Configurar los bordes de las barras
+                for trace in fig_historial.data:
+                    # Asegurar que el marcador y la línea estén inicializados
+                    if not hasattr(trace, 'marker'):
+                        trace.marker = {}
+                    if 'line' not in trace.marker:
+                        trace.marker.line = {}
+                    
+                    # Inicializar listas para los bordes
+                    line_widths = [1] * len(trace.x)
+                    line_colors = ['rgba(0,0,0,0)'] * len(trace.x)
+                    
+                    # Verificar si hay datos personalizados
+                    if hasattr(trace, 'customdata') and trace.customdata is not None:
+                        for i, custom_data in enumerate(trace.customdata):
+                            if i < len(line_widths) and len(custom_data) > 2 and custom_data[2]:  # es_salida_campo es True
+                                line_widths[i] = 2
+                                line_colors[i] = 'red'
+                    
+                    # Aplicar los bordes
+                    trace.marker.line.width = line_widths
+                    trace.marker.line.color = line_colors
                 
                 # Asegurar que las barras se agrupen correctamente
                 fig_historial.update_layout(
@@ -1040,19 +1094,47 @@ def seccion_horarios(client, personal_list):
                     bargroupgap=0.1
                 )
                 
-                # Actualizar el formato del hover
-                fig_historial.update_traces(
-                    hovertemplate='<b>%{customdata[0]}</b><br>Tipo: %{customdata[1]}<br>Horas: %{y:.2f}<extra></extra>',
-                    # Aumentar el ancho de las barras para mejor visualización
-                    width=0.4,
-                    # Añadir borde a las barras para mejor contraste
-                    marker=dict(
-                        line=dict(
-                            width=1,
-                            color='DarkSlateGrey'
-                        )
-                    )
-                )
+                # Actualizar los textos de hover para mostrar información detallada
+                for trace in fig_historial.data:
+                    hover_texts = []
+                    
+                    if hasattr(trace, 'customdata') and trace.customdata is not None:
+                        for i, custom_data in enumerate(trace.customdata):
+                            if i < len(trace.y):
+                                fecha_texto = custom_data[0] if len(custom_data) > 0 else str(trace.x[i])
+                                tipo = custom_data[1] if len(custom_data) > 1 else 'DESCONOCIDO'
+                                horas = trace.y[i]
+                                
+                                if len(custom_data) > 2 and custom_data[2]:  # es_salida_campo es True
+                                    hover_text = (
+                                        f'<b>{fecha_texto}</b><br>' +
+                                        f'Tipo: {tipo}<br>' +
+                                        f'Horas: {horas:.2f}<br>' +
+                                        '<b>Posible salida al campo</b><br>'
+                                    )
+                                else:
+                                    hover_text = f'<b>{fecha_texto}</b><br>Tipo: {tipo}<br>Horas: {horas:.2f}'
+                                
+                                hover_texts.append(hover_text)
+                    
+                    # Aplicar los textos de hover si hay datos
+                    if hover_texts:
+                        trace.hovertemplate = '%{customdata[0]}<extra></extra>'
+                        trace.customdata = [[ht] for ht in hover_texts]
+                    
+                    # Ajustar el ancho de las barras para mejor visualización
+                    trace.width = 0.4
+                    
+                    # Asegurar que todas las barras tengan un borde por defecto
+                    if not hasattr(trace, 'showlegend') or trace.showlegend is not False:
+                        # Solo aplicar bordes a las barras, no a los ítems de la leyenda
+                        if not hasattr(trace.marker, 'line'):
+                            trace.marker.line = dict(width=1, color='DarkSlateGrey')
+                        elif isinstance(trace.marker.line, dict):
+                            if 'width' not in trace.marker.line:
+                                trace.marker.line['width'] = 1
+                            if 'color' not in trace.marker.line:
+                                trace.marker.line['color'] = 'DarkSlateGrey'
                 
                 # Ajustar el diseño del gráfico
                 fig_historial.update_layout(
@@ -1066,7 +1148,11 @@ def seccion_horarios(client, personal_list):
                         xanchor="right",
                         x=1,
                         title_font=dict(size=12),
-                        font=dict(size=11)
+                        font=dict(size=11),
+                        bordercolor='rgba(0,0,0,0)',
+                        borderwidth=0,
+                        itemwidth=30,
+                        itemsizing='constant'
                     ),
                     margin=dict(l=20, r=20, t=40, b=20),
                     plot_bgcolor='rgba(0,0,0,0)',
@@ -1083,7 +1169,22 @@ def seccion_horarios(client, personal_list):
                         gridwidth=0.5,
                         title_text='Horas Trabajadas'
                     ),
-                    height=400
+                    height=400,
+                    # Añadir anotación explicativa sobre los días resaltados
+                    annotations=[
+                        dict(
+                            x=0.5,
+                            y=-0.2,
+                            showarrow=False,
+                            text="Días resaltados en rojo indican posible salida al campo (2 registros de reloj y más de 7 horas trabajadas)",
+                            xref="paper",
+                            yref="paper",
+                            font=dict(
+                                size=12,
+                                color="red"
+                            )
+                        )
+                    ]
                 )
                 
                 # Añadir línea horizontal en 8 horas
