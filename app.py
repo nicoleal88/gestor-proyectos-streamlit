@@ -1,22 +1,26 @@
 import streamlit as st
-from streamlit_option_menu import option_menu
 from google_sheets_client import connect_to_google_sheets, init_session_state
-from typing import Dict, List, Optional
-from ui_sections.tareas import seccion_tareas
-from ui_sections.vacaciones import seccion_vacaciones
-from ui_sections.compensados import seccion_compensados
-from ui_sections.notas import seccion_notas
-from ui_sections.recordatorios import seccion_recordatorios
-from ui_sections.calendario import seccion_calendario
-from ui_sections.horarios import seccion_horarios
-from ui_sections.eventos import mostrar_seccion_eventos
-from ui_sections.bienvenida import mostrar_seccion_bienvenida
+from typing import Dict, List, Optional, Callable
+import importlib
+import os
 
 # Mapeo de roles a permisos
 ROLES_PERMISOS = {
     'admin': ['inicio', 'tareas', 'vacaciones', 'compensados', 'eventos', 'notas', 'recordatorios', 'calendario', 'horarios'],
     'empleado': ['inicio', 'tareas', 'vacaciones'],
     'invitado': ['inicio']
+}
+
+# Mapeo de páginas a sus permisos requeridos
+PAGE_PERMISSIONS = {
+    '00_🏠_Inicio': 'inicio',
+    '01_✅_Tareas': 'tareas',
+    '02_📅_Vacaciones': 'vacaciones',
+    '03_⏱️_Compensados': 'compensados',
+    '04_📝_Notas': 'notas',
+    '05_🔔_Recordatorios': 'recordatorios',
+    '06_📆_Calendario': 'calendario',
+    '07_👥_Horarios': 'horarios'
 }
 
 def obtener_rol_usuario(email: str) -> str:
@@ -48,89 +52,91 @@ def login_screen():
     st.subheader("Por favor inicia sesión para continuar")
     st.button("Iniciar sesión con Google", on_click=st.login)
 
-# --- FUNCIONES AUXILIARES ---
-def get_personal_list():
-    if "df_personal" in st.session_state and not st.session_state.df_personal.empty:
-        return st.session_state.df_personal.iloc[:, 0].tolist()
-    return []
+def get_available_pages(rol: str) -> List[str]:
+    """Obtiene la lista de páginas disponibles según el rol del usuario"""
+    available_pages = []
+    pages_dir = os.path.join(os.path.dirname(__file__), 'pages')
+    
+    if not os.path.exists(pages_dir):
+        return available_pages
+        
+    for filename in sorted(os.listdir(pages_dir)):
+        if filename.endswith('.py') and not filename.startswith('.'):
+            page_name = os.path.splitext(filename)[0]
+            # Obtener el permiso requerido para esta página
+            permission_required = PAGE_PERMISSIONS.get(page_name, '').lower()
+            
+            # Si la página no está en el mapeo de permisos, se asume que requiere permiso de admin
+            if not permission_required:
+                permission_required = 'admin'
+                
+            # Verificar si el rol tiene permiso para acceder a esta página
+            if tiene_permiso(rol, permission_required):
+                available_pages.append(filename)
+    
+    return available_pages
 
-# --- APP PRINCIPAL ---
+def load_page(page_file: str):
+    """Carga dinámicamente una página y devuelve su función page()"""
+    module_name = f"pages.{os.path.splitext(page_file)[0]}"
+    try:
+        module = importlib.import_module(module_name)
+        return module.page
+    except (ImportError, AttributeError) as e:
+        st.error(f"Error al cargar la página {page_file}: {e}")
+        return None
+
 def main():
-    st.set_page_config(page_title="Gestor de Proyectos", layout="wide")
+    st.set_page_config(
+        page_title="Gestor de Proyectos",
+        layout="wide",
+        page_icon="📊"
+    )
     
     # Verificar si el usuario ha iniciado sesión
     if not st.user.is_logged_in:
         login_screen()
         return
-        
+    
     # Obtener rol del usuario
     rol_usuario = obtener_rol_usuario(st.user.email)
     
-    # Mostrar información del usuario en el sidebar
-    st.sidebar.markdown(f"## **Usuario:** {st.user.name}")
-    st.sidebar.markdown(f"**Rol:** {rol_usuario.capitalize()}")
-    st.sidebar.button("Cerrar sesión", on_click=st.logout)
-    st.sidebar.markdown("---")
-
-    # st.markdown(f"<h1 style='text-align:center'>📊 Gestor de Proyectos</h1>", unsafe_allow_html=True)
-
+    # Inicializar cliente de Google Sheets
     client = connect_to_google_sheets()
-
     if client:
         init_session_state(client)
-        personal_list = get_personal_list()
-
-        # Filtrar opciones del menú según los permisos del usuario
-        opciones_menu = []
-        iconos_menu = []
+    
+    # Obtener páginas disponibles para este rol
+    available_pages = get_available_pages(rol_usuario)
+    
+    # Crear páginas
+    pages = []
+    for page_file in available_pages:
+        page_name = os.path.splitext(page_file)[0]
+        # Extraer el nombre legible del nombre del archivo (después del primer _)
+        display_name = ' '.join(page_name.split('_')[1:])
         
-        # Mapeo de secciones a nombres para mostrar y sus íconos
-        secciones_disponibles = {
-            "Inicio": ('house', 'inicio'),
-            "Tareas": ('list-check', 'tareas'),
-            "Vacaciones": ('calendar-check', 'vacaciones'),
-            "Compensados": ('clock-history', 'compensados'),
-            "Eventos": ('calendar-event', 'eventos'),
-            "Notas": ('sticky', 'notas'),
-            "Recordatorios": ('bell', 'recordatorios'),
-            "Calendario": ('calendar', 'calendario'),
-            "Horarios": ('people', 'horarios')
-        }
-        
-        # Filtrar secciones según permisos
-        for seccion, (icono, permiso) in secciones_disponibles.items():
-            if tiene_permiso(rol_usuario, permiso):
-                opciones_menu.append(seccion)
-                iconos_menu.append(icono)
-        
+        # Crear la página
+        page_func = load_page(page_file)
+        if page_func:
+            pages.append(st.Page(
+                page_func,
+                title=display_name,
+                icon=page_name.split('_')[1] if len(page_name.split('_')) > 1 else None
+            ))
+    
+    # Mostrar navegación y ejecutar la página seleccionada
+    if pages:
         with st.sidebar:
-            seccion = option_menu(
-                "Menú Principal",
-                opciones_menu,
-                icons=iconos_menu,
-                menu_icon="cast",
-                default_index=0
-            )
-
-        if seccion == "Inicio":
-            mostrar_seccion_bienvenida()
-        elif seccion == "Tareas":
-            seccion_tareas(client, personal_list)
-        elif seccion == "Vacaciones":
-            seccion_vacaciones(client, personal_list)
-        elif seccion == "Compensados":
-            seccion_compensados(client, personal_list)
-        elif seccion == "Notas":
-            seccion_notas(client, personal_list)
-        elif seccion == "Recordatorios":
-            seccion_recordatorios(client, personal_list)
-        elif seccion == "Eventos":
-            mostrar_seccion_eventos(client)
-        elif seccion == "Calendario":
-            seccion_calendario(client)
-        elif seccion == "Horarios":
-            seccion_horarios(client, personal_list)
-
+            st.markdown(f"## **Usuario:** {st.user.name}")
+            st.markdown(f"**Rol:** {rol_usuario.capitalize()}")
+            st.button("Cerrar sesión", on_click=st.logout)
+            st.markdown("---")
+            
+            # Mostrar navegación y obtener la página seleccionada
+            selected_page = st.navigation(pages).run()
+    else:
+        st.error("No hay páginas disponibles para tu rol. Contacta al administrador.")
 
 if __name__ == "__main__":
     main()

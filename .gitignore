@@ -10,3 +10,5 @@ __pycache__/*
 ToDo.md
 
 .streamlit
+
+pages/__pycache__/*
