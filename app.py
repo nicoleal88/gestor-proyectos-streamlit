@@ -3,6 +3,7 @@ from google_sheets_client import connect_to_google_sheets, init_session_state
 from typing import Dict, List, Optional, Callable
 import importlib
 import os
+from version_manager import display_version_sidebar
 
 # Mapeo de roles a permisos
 ROLES_PERMISOS = {
@@ -145,6 +146,11 @@ def main():
             st.markdown(f"## **Usuario:** {st.user.name}")
             st.markdown(f"**Rol:** {rol_usuario.capitalize()}")
             st.button("Cerrar sesión", on_click=st.logout)
+            st.markdown("---")
+
+            # Mostrar información de versión
+            display_version_sidebar()
+
             st.markdown("---")
 
             # Mostrar navegación en el sidebar
