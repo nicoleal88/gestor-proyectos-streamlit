@@ -86,29 +86,27 @@ def get_detailed_version_string() -> str:
 **Autor:** {info['author']}
 **Mensaje:** {info['message']}"""
 
-def display_simple_version_sidebar(user_role: str = 'invitado'):
+def display_simple_version_sidebar():
     """
     Mostrar información simplificada en el sidebar.
     Solo fecha del último commit.
-    Los detalles solo se muestran a usuarios con rol admin.
     """
     import streamlit as st
 
     vm = SimpleVersionManager()
     info = vm.get_simple_version_info()
 
-    # Mostrar versión simple para todos los usuarios
+    # Mostrar versión simple
     st.caption(f"📅 {get_simple_version_string()}")
 
-    # Mostrar información detallada solo para admins
-    if user_role == 'admin':
-        with st.expander("ℹ️ Detalles del commit"):
-            st.markdown(get_detailed_version_string())
+    # Mostrar información detallada en expander
+    with st.expander("ℹ️ Detalles del commit"):
+        st.markdown(get_detailed_version_string())
 
-            # Botón para copiar hash (solo para admins)
-            if st.button("📋 Copiar Hash del Commit"):
-                st.code(info['commit_hash'], language=None)
-                st.success("Hash copiado!")
+        # Botón para copiar hash
+        if st.button("📋 Copiar Hash del Commit"):
+            st.code(info['commit_hash'], language=None)
+            st.success("Hash copiado!")
 
 def main():
     """Función principal para pruebas"""
