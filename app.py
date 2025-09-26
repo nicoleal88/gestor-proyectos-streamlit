@@ -3,7 +3,7 @@ from google_sheets_client import connect_to_google_sheets, init_session_state
 from typing import Dict, List, Optional, Callable
 import importlib
 import os
-from version_manager import display_version_sidebar
+from version_manager import display_simple_version_sidebar
 
 # Mapeo de roles a permisos
 ROLES_PERMISOS = {
@@ -149,7 +149,7 @@ def main():
             st.markdown("---")
 
             # Mostrar información de versión
-            display_version_sidebar()
+            display_simple_version_sidebar()
 
             st.markdown("---")
 
