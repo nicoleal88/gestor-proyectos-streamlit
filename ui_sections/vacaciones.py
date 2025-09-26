@@ -20,22 +20,62 @@ def seccion_vacaciones(client, personal_list):
         df_vacaciones['Fecha inicio'] = pd.to_datetime(df_vacaciones['Fecha inicio'], errors='coerce')
         df_vacaciones['Fecha regreso'] = pd.to_datetime(df_vacaciones['Fecha regreso'], errors='coerce')
         # Ajustar la fecha fin para mostrar el último día de vacaciones (un día antes del regreso)
-        df_vacaciones['Último día de vacaciones'] = df_vacaciones['Fecha regreso'] - pd.Timedelta(days=1) 
-        
-        today = pd.to_datetime(datetime.now().date())
-        # Ajustar la lógica para usar el último día de vacaciones en lugar de la fecha de regreso
-        en_curso = ((df_vacaciones['Fecha inicio'] <= today) & (df_vacaciones['Último día de vacaciones'] >= today)).sum()
-        proximas = (df_vacaciones['Fecha inicio'] > today).sum()
-        col1, col2, col3 = st.columns(3)
-        col1.metric("Total Registros", len(df_vacaciones))
-        col2.metric("Licencias en Curso", en_curso)
-        col3.metric("Próximas Licencias", proximas)
+        df_vacaciones['Último día de vacaciones'] = df_vacaciones['Fecha regreso'] - pd.Timedelta(days=1)
 
-    st.markdown("---")
+        today = pd.to_datetime(datetime.now().date())
+
+        # Calcular métricas basadas en TODOS los registros (no filtrados)
+        en_curso_total = ((df_vacaciones['Fecha inicio'] <= today) & (df_vacaciones['Último día de vacaciones'] >= today)).sum()
+        proximas_total = (df_vacaciones['Fecha inicio'] > today).sum()
+        transcurridas_total = (df_vacaciones['Último día de vacaciones'] < today).sum()
+
+        col1, col2, col3, col4 = st.columns(4)
+        col1.metric("Total Registros", len(df_vacaciones))
+        col2.metric("Licencias en Curso", en_curso_total)
+        col3.metric("Próximas Licencias", proximas_total)
+        col4.metric("Licencias Transcurridas", transcurridas_total)
+
+        st.markdown("---")
     vista_general, nueva_licencia, modificar_licencia = st.tabs(["📊 Vista General", "➕ Nueva Licencia", "✏️ Modificar / Eliminar"])
 
     with vista_general:
-        df_display = df_vacaciones.sort_values(by='Fecha inicio', ascending=False)
+        if not df_vacaciones.empty:
+            # Filtro por estado de las licencias
+            today = pd.to_datetime(datetime.now().date())
+
+            # Crear opciones de filtro
+            filter_options = ["Licencias en Curso", "Próximas Licencias", "Licencias Transcurridas", "Todas"]
+            default_filter = "Licencias en Curso"
+
+            selected_filter = st.selectbox(
+                "Filtrar por Estado",
+                options=filter_options,
+                index=filter_options.index(default_filter)
+            )
+
+            # Aplicar filtro según la selección
+            df_filtered = df_vacaciones.copy()
+
+            if selected_filter == "Licencias en Curso":
+                # Licencias que están actualmente en curso (inicio <= hoy <= último día)
+                df_filtered = df_filtered[
+                    (df_filtered['Fecha inicio'] <= today) &
+                    (df_filtered['Último día de vacaciones'] >= today)
+                ]
+            elif selected_filter == "Próximas Licencias":
+                # Licencias que aún no han empezado (inicio > hoy)
+                df_filtered = df_filtered[df_filtered['Fecha inicio'] > today]
+            elif selected_filter == "Licencias Transcurridas":
+                # Licencias que ya terminaron (último día < hoy)
+                df_filtered = df_filtered[df_filtered['Último día de vacaciones'] < today]
+            # "Todas" no aplica ningún filtro adicional
+
+            st.info(f"Mostrando: {selected_filter} ({len(df_filtered)} registros)")
+
+        else:
+            df_filtered = df_vacaciones.copy()
+
+        df_display = df_filtered.sort_values(by='Fecha inicio', ascending=False)
         if 'row_number' in df_display.columns:
             df_display = df_display.drop(columns=['row_number'])
 

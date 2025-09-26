@@ -20,23 +20,62 @@ def seccion_compensados(client, personal_list):
         df_compensados['Desde fecha'] = pd.to_datetime(df_compensados['Desde fecha'], errors='coerce')
         df_compensados['Hasta fecha'] = pd.to_datetime(df_compensados['Hasta fecha'], errors='coerce')
         today = pd.to_datetime(datetime.now().date())
-        en_curso = ((df_compensados['Desde fecha'] <= today) & (df_compensados['Hasta fecha'] >= today)).sum()
-        proximos = (df_compensados['Desde fecha'] > today).sum()
-        col1, col2, col3 = st.columns(3)
+
+        # Calcular métricas basadas en TODOS los registros (no filtrados)
+        en_curso_total = ((df_compensados['Desde fecha'] <= today) & (df_compensados['Hasta fecha'] >= today)).sum()
+        proximos_total = (df_compensados['Desde fecha'] > today).sum()
+        transcurridos_total = (df_compensados['Hasta fecha'] < today).sum()
+
+        col1, col2, col3, col4 = st.columns(4)
         col1.metric("Total de Registros", len(df_compensados))
-        col2.metric("Compensatorios en Curso", en_curso)
-        col3.metric("Próximos Compensatorios", proximos)
-    else:
-        st.metric("Total de Registros", 0)
-    st.markdown("---")
+        col2.metric("Compensatorios en Curso", en_curso_total)
+        col3.metric("Próximos Compensatorios", proximos_total)
+        col4.metric("Compensatorios Transcurridos", transcurridos_total)
+
+        st.markdown("---")
 
     vista_general, agregar_compensatorio, modificar_eliminar = st.tabs(["📊 Vista General", "➕ Agregar Compensatorio", "✏️ Modificar / Eliminar"])
 
     with vista_general:
-        df_display = df_compensados.copy()
+        if not df_compensados.empty:
+            # Filtro por estado de los compensatorios
+            today = pd.to_datetime(datetime.now().date())
+
+            # Crear opciones de filtro
+            filter_options = ["Compensatorios en Curso", "Próximos Compensatorios", "Compensatorios Transcurridos", "Todos"]
+            default_filter = "Compensatorios en Curso"
+
+            selected_filter = st.selectbox(
+                "Filtrar por Estado",
+                options=filter_options,
+                index=filter_options.index(default_filter)
+            )
+
+            # Aplicar filtro según la selección
+            df_filtered = df_compensados.copy()
+
+            if selected_filter == "Compensatorios en Curso":
+                # Compensatorios que están actualmente en curso (desde <= hoy <= hasta)
+                df_filtered = df_filtered[
+                    (df_filtered['Desde fecha'] <= today) &
+                    (df_filtered['Hasta fecha'] >= today)
+                ]
+            elif selected_filter == "Próximos Compensatorios":
+                # Compensatorios que aún no han empezado (desde > hoy)
+                df_filtered = df_filtered[df_filtered['Desde fecha'] > today]
+            elif selected_filter == "Compensatorios Transcurridos":
+                # Compensatorios que ya terminaron (hasta < hoy)
+                df_filtered = df_filtered[df_filtered['Hasta fecha'] < today]
+            # "Todos" no aplica ningún filtro adicional
+
+            st.info(f"Mostrando: {selected_filter} ({len(df_filtered)} registros)")
+
+        else:
+            df_filtered = df_compensados.copy()
+
+        df_display = df_filtered.sort_values(by='Desde fecha', ascending=False)
         if 'row_number' in df_display.columns:
             df_display = df_display.drop(columns=['row_number'])
-        df_display = df_display.sort_values(by='Desde fecha', ascending=False)
 
         def style_status(row):
             today = pd.to_datetime(datetime.now().date()).date()
