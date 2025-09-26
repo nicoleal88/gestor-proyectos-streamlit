@@ -9,7 +9,7 @@ import plotly.graph_objects as go
 from typing import Dict, Optional
 from ui_sections.pronostico import obtener_pronostico_extendido, mostrar_grafico_pronostico
 
-# Configurar locale en español
+# Configurar locale en español con fallback robusto
 spanish_locales = [
     'es_ES.UTF-8', 'es_ES.utf8', 'es_ES', 'es-ES',
     'es_AR.UTF-8', 'es_AR.utf8', 'es_AR', 'es-AR',
@@ -23,12 +23,53 @@ for loc in spanish_locales:
     try:
         locale.setlocale(locale.LC_TIME, loc)
         locale_configured = True
+        print(f"✅ Locale configurado correctamente: {loc}")
         break
     except locale.Error:
         continue
 
+# Si no se pudo configurar el locale, usar implementación alternativa
 if not locale_configured:
-    st.warning("No se pudo configurar el locale en español. Las fechas se mostrarán en inglés.")
+    print("ℹ️ Usando traducciones manuales para fechas en español")
+
+def formatear_fecha_espanol(datetime_obj, formato='completo'):
+    """
+    Formatear fecha en español sin depender del locale del sistema.
+
+    Args:
+        datetime_obj: objeto datetime
+        formato: 'completo' para fecha completa, 'corto' para fecha corta
+    """
+    # Diccionarios de traducción
+    meses = {
+        'January': 'Enero', 'February': 'Febrero', 'March': 'Marzo',
+        'April': 'Abril', 'May': 'Mayo', 'June': 'Junio',
+        'July': 'Julio', 'August': 'Agosto', 'September': 'Septiembre',
+        'October': 'Octubre', 'November': 'Noviembre', 'December': 'Diciembre'
+    }
+
+    dias = {
+        'Monday': 'Lunes', 'Tuesday': 'Martes', 'Wednesday': 'Miércoles',
+        'Thursday': 'Jueves', 'Friday': 'Viernes', 'Saturday': 'Sábado',
+        'Sunday': 'Domingo'
+    }
+
+    # Obtener componentes de fecha en inglés
+    dia_semana_ingles = datetime_obj.strftime('%A')
+    mes_ingles = datetime_obj.strftime('%B')
+
+    # Traducir a español
+    dia_semana = dias.get(dia_semana_ingles, dia_semana_ingles)
+    mes = meses.get(mes_ingles, mes_ingles)
+    dia = datetime_obj.day
+    anio = datetime_obj.year
+
+    if formato == 'completo':
+        return f"{dia_semana}, {dia} de {mes} de {anio}"
+    elif formato == 'corto':
+        return f"{dia:02d}/{datetime_obj.month:02d}/{anio}"
+    else:
+        return f"{dia_semana}, {dia} de {mes} de {anio}"
 
 @st.cache_data(ttl=3600)  # Cache por 1 hora
 def obtener_pronostico_extendido(lat=-35.4755, lon=-69.5843):
@@ -150,28 +191,12 @@ def mostrar_seccion_bienvenida():
     # Obtener fecha y hora actual
     now = datetime.now(pytz.timezone('America/Argentina/Buenos_Aires'))
     
-    # Diccionario de traducción para los meses y días
-    meses = {
-        'January': 'Enero', 'February': 'Febrero', 'March': 'Marzo',
-        'April': 'Abril', 'May': 'Mayo', 'June': 'Junio',
-        'July': 'Julio', 'August': 'Agosto', 'September': 'Septiembre',
-        'October': 'Octubre', 'November': 'Noviembre', 'December': 'Diciembre'
-    }
-    
-    dias = {
-        'Monday': 'Lunes', 'Tuesday': 'Martes', 'Wednesday': 'Miércoles',
-        'Thursday': 'Jueves', 'Friday': 'Viernes', 'Saturday': 'Sábado',
-        'Sunday': 'Domingo'
-    }
-    
     if locale_configured:
         # Si el locale está configurado, usamos strftime
         fecha = now.strftime('%A, %d de %B de %Y')
     else:
-        # Si no, usamos el diccionario de traducción
-        dia_semana = dias.get(now.strftime('%A'), now.strftime('%A'))
-        mes = meses.get(now.strftime('%B'), now.strftime('%B'))
-        fecha = f"{dia_semana}, {now.day} de {mes} de {now.year}"
+        # Si no, usamos la función de formateo manual
+        fecha = formatear_fecha_espanol(now, formato='completo')
     
     st.subheader(f"📅 {fecha}")
     st.markdown("---")
