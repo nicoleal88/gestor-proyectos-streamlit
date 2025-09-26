@@ -1,198 +1,250 @@
-# Gestor de Proyectos con Streamlit y Google Sheets
+# 📊 Gestor de Proyectos - Streamlit
 
-Esta es una aplicación web moderna creada con Streamlit que sirve como un frontend para gestionar proyectos, tareas, vacaciones y notas. Utiliza una hoja de cálculo de Google Sheets como backend para almacenar todos los datos.
+Una aplicación web moderna para gestión integral de proyectos, tareas, vacaciones y recursos empresariales, construida con Streamlit y Google Sheets.
 
-La aplicación utiliza la nueva arquitectura de aplicaciones multipágina de Streamlit con `st.Page` y `st.navigation` para una mejor organización y experiencia de usuario.
+## 🚀 Características Principales
 
----
-
-## ✨ Características Principales
-
-- **Arquitectura Moderna**: Aplicación multipágina con navegación moderna usando `st.Page` y `st.navigation`
-- Gestión de personal y tareas
-- Registro de vacaciones con cálculo automático de fechas
-- Control de horas compensadas
-- Sistema de notas y recordatorios
-- Calendario integrado con visualización de eventos
-- Autenticación de usuarios con roles de administrador, empleado e invitado
-- Integración con Google Sheets para almacenamiento de datos
-- Visualización de datos con gráficos interactivos
-- Control de acceso basado en roles
-
----
-
-## 🚀 Cómo Ejecutar la Aplicación
-
-### 📋 Requisitos Previos
-
-- Python 3.9 o superior
-- Una cuenta de Google
-- Acceso a Google Cloud Console
-
-### 🛠️ Instalación
-
-1. **Clona el repositorio:**
-
-   ```bash
-   git clone [URL_DEL_REPOSITORIO]
-   cd gestor_proyectos_streamlit
-   ```
-
-2. **Crea y activa un entorno virtual (recomendado):**
-
-   ```bash
-   python -m venv venv
-   source venv/bin/activate  # En Windows: venv\Scripts\activate
-   ```
-
-3. **Instala las dependencias:**
-
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-### 🔑 Configuración de Google Sheets
-
-#### 1. Habilitar las APIs de Google
-
-- Ve a la [Consola de Google Cloud](https://console.cloud.google.com/)
-- Crea un nuevo proyecto o selecciona uno existente
-- Habilita las siguientes APIs:
-  - Google Drive API
-  - Google Sheets API
-
-#### 2. Crear una Cuenta de Servicio
-
-1. Navega a `IAM y administración` > `Cuentas de servicio`
-2. Haz clic en `+ CREAR CUENTA DE SERVICIO`
-3. Completa la información solicitada y haz clic en `CREAR Y CONTINUAR`
-4. Haz clic en `CONTINUAR` sin asignar roles
-5. Haz clic en `HECHO`
-
-#### 3. Generar y Configurar las Credenciales
-
-1. En la lista de cuentas de servicio, busca la que acabas de crear
-2. Haz clic en los tres puntos y selecciona `Administrar claves`
-3. Haz clic en `AGREGAR CLAVE` > `Crear nueva clave`
-4. Selecciona `JSON` y haz clic en `CREAR`
-5. Mueve el archivo descargado a la raíz del proyecto y renómbralo a `credenciales.json`
-
-#### 4. Configurar la Hoja de Cálculo
-
-1. Crea una nueva hoja de cálculo en [Google Sheets](https://sheets.google.com)
-2. Nómbrala `GestorProyectosStreamlit`
-3. Comparte la hoja con el email de la cuenta de servicio (encontrado en `credenciales.json` como `client_email`)
-4. Asegúrate de dar permisos de **Editor**
-
-#### 5. Estructura de la Hoja de Cálculo
-
-La aplicación espera que la hoja de cálculo de Google Sheets contenga las siguientes pestañas con sus respectivas columnas:
-
-**Pestaña `Personal`:**
-- `Apellido, Nombres`
-
-**Pestaña `Tareas`:**
-- `ID`, `Título Tarea`, `Tarea`, `Responsable`, `Fecha límite`, `Estado`
-
-**Pestaña `Comentarios`:**
-- `ID_Tarea`, `Fecha`, `Comentario`
-
-**Pestaña `Vacaciones`:**
-- `Apellido, Nombres`, `Fecha solicitud`, `Tipo`, `Fecha inicio`, `Fecha regreso`, `Observaciones`
-
-**Pestaña `Compensados`:**
-- `Apellido, Nombre`, `Fecha Solicitud`, `Tipo`, `Desde fecha`, `Desde hora`, `Hasta fecha`, `Hasta hora`
-
-**Pestaña `Notas`:**
-- `Fecha`, `Remitente`, `DNI`, `Teléfono`, `Motivo`, `Responsable`, `Estado`
-
-**Pestaña `Recordatorios`:**
-- `Fecha`, `Mensaje`, `Responsable`
-
-### 6. Ejecutar la Aplicación
-
-```bash
-streamlit run app.py
-```
-
-La aplicación se abrirá en tu navegador web. La navegación aparecerá en la barra lateral con las páginas disponibles según tu rol de usuario.
-
----
+- ✅ **Gestión de Tareas**: Sistema completo con estados, prioridades y seguimiento
+- 📅 **Control de Vacaciones**: Registro y seguimiento de licencias y días libres
+- ⏱️ **Compensatorios**: Gestión de horas compensatorias y días adicionales
+- 📝 **Sistema de Notas**: Registro de solicitudes y comunicaciones
+- 🔔 **Recordatorios**: Sistema de alertas y notificaciones
+- 📆 **Calendario**: Vista integrada de eventos y fechas importantes
+- 👥 **Gestión de Horarios**: Control de turnos y horarios del personal
+- 🌤️ **Información Adicional**: Clima, cotizaciones y datos útiles
 
 ## 📁 Estructura del Proyecto
 
 ```
 gestor_proyectos_streamlit/
-├── app.py                    # Archivo principal con la lógica de navegación
-├── google_sheets_client.py   # Cliente para integración con Google Sheets
-├── requirements.txt          # Dependencias del proyecto
-├── pages/                    # Directorio con las páginas de la aplicación
-│   ├── 00_Inicio.py          # Página de bienvenida
-│   ├── 01_Tareas.py          # Gestión de tareas
-│   ├── 02_Vacaciones.py      # Registro de vacaciones
-│   ├── 03_Compensados.py     # Control de horas compensadas
-│   ├── 04_Notas.py           # Sistema de notas
-│   ├── 05_Recordatorios.py   # Recordatorios
-│   ├── 06_Calendario.py      # Calendario de eventos
-│   └── 07_Horarios.py        # Gestión de horarios
-├── ui_sections/              # Módulos de la interfaz de usuario
-│   ├── bienvenida.py
-│   ├── tareas.py
-│   ├── vacaciones.py
-│   ├── compensados.py
-│   ├── notas.py
-│   ├── recordatorios.py
-│   ├── calendario.py
-│   ├── horarios.py
-│   └── eventos.py
-├── credenciales.json         # Credenciales de Google (no subir a git)
-└── README.md
+├── app.py                    # 🏠 Aplicación principal con navegación multipágina
+├── google_sheets_client.py   # 🔗 Cliente para integración con Google Sheets
+├── requirements.txt          # 📦 Dependencias del proyecto
+├── pytest.ini               # ⚙️ Configuración de pruebas
+├── README.md                 # 📖 Documentación principal
+├── ToDo.md                   # 📋 Estado del proyecto y tareas pendientes
+│
+├── pages/                    # 📄 Páginas de la aplicación
+│   ├── 00_Inicio.py          # 🏠 Página de bienvenida
+│   ├── 01_Tareas.py          # ✅ Gestión de tareas
+│   ├── 02_Vacaciones.py      # 📅 Registro de vacaciones
+│   ├── 03_Compensados.py     # ⏱️ Control de horas compensadas
+│   ├── 04_Notas.py           # 📝 Sistema de notas
+│   ├── 05_Recordatorios.py   # 🔔 Recordatorios
+│   ├── 06_Calendario.py      # 📆 Calendario de eventos
+│   └── 07_Horarios.py        # 👥 Gestión de horarios
+│
+├── ui_sections/              # 🧩 Módulos de la interfaz de usuario
+│   ├── bienvenida.py         # Funciones de la página de inicio
+│   ├── tareas.py             # Lógica de gestión de tareas
+│   ├── vacaciones.py         # Funciones de vacaciones
+│   ├── compensados.py        # Lógica de compensatorios
+│   ├── notas.py              # Sistema de notas
+│   ├── recordatorios.py      # Funciones de recordatorios
+│   ├── calendario.py         # Lógica del calendario
+│   ├── horarios.py           # Gestión de horarios
+│   ├── eventos.py            # Sistema de eventos
+│   └── pronostico.py         # Información meteorológica
+│
+├── tests/                    # 🧪 Suite de pruebas
+│   ├── __init__.py           # Inicialización del paquete de tests
+│   ├── conftest.py           # Fixtures y configuración de pytest
+│   ├── test_app.py           # Tests de la aplicación principal
+│   ├── test_google_sheets.py # Tests de integración con Google Sheets
+│   ├── test_notas_filter.py  # Tests específicos de filtros en Notas
+│   ├── test_vacaciones_filter.py # Tests específicos de filtros en Vacaciones
+│   └── test_compensados_filter.py # Tests específicos de filtros en Compensados
+│
+├── scripts/                  # 🔧 Scripts de utilidad y herramientas
+│   ├── __init__.py           # Inicialización del paquete de scripts
+│   ├── run_tests.sh          # Script para ejecutar pruebas
+│   ├── verify_structure.py   # Verificación de estructura del proyecto
+│   ├── update_colors.py      # Actualización de colores para modo oscuro
+│   └── color_selector.py     # Selector interactivo de temas de color
+│
+├── docs/                     # 📚 Documentación adicional
+│   ├── __init__.py           # Inicialización del paquete de docs
+│   └── AGENTS.md             # Información sobre agentes y desarrollo
+│
+└── backups/                  # 💾 Archivos de respaldo
+    ├── __init__.py           # Inicialización del paquete de backups
+    └── ToDo.md.backup        # Copia de seguridad del archivo ToDo
 ```
 
----
+## 🛠️ Instalación y Configuración
 
-## 🔐 Sistema de Roles
-
-La aplicación implementa un sistema de control de acceso basado en roles:
-
-- **Administrador**: Acceso completo a todas las secciones
-- **Empleado**: Acceso a tareas, vacaciones y su información personal
-- **Invitado**: Acceso solo a la página de inicio
-
-Los roles se configuran en el archivo `.streamlit/secrets.toml` con las listas de emails de cada rol.
-
----
-
-## 🛠️ Comandos Útiles
-
+### 1. Clonar el Repositorio
 ```bash
-# Ejecutar la aplicación
-streamlit run app.py
-
-# Instalar dependencias
-pip install -r requirements.txt
-
-# Ejecutar tests
-pytest
-
-# Formatear código
-black .
-
-# Linting
-flake8 .
-
-# Type checking
-mypy .
+git clone <url-del-repositorio>
+cd gestor_proyectos_streamlit
 ```
+
+### 2. Crear Entorno Virtual
+```bash
+python -m venv venv
+source venv/bin/activate  # En Windows: venv\Scripts\activate
+```
+
+### 3. Instalar Dependencias
+```bash
+pip install -r requirements.txt
+```
+
+### 4. Configurar Google Sheets
+- Crear un proyecto en [Google Cloud Console](https://console.cloud.google.com/)
+- Habilitar la Google Sheets API
+- Crear credenciales de tipo "Cuenta de servicio"
+- Descargar el archivo `credenciales.json` y colocarlo en la raíz del proyecto
+- Crear una hoja de cálculo en Google Sheets llamada "GestorProyectosStreamlit"
+- Configurar las pestañas necesarias según la documentación
+
+### 5. Configurar Secrets de Streamlit
+Crear el archivo `.streamlit/secrets.toml`:
+```toml
+[roles]
+admin_emails = ["admin@empresa.com"]
+empleado_emails = ["empleado@empresa.com"]
+
+[api_keys]
+openweather = "tu_clave_api_aqui"
+exchangerate = "tu_clave_api_aqui"
+```
+
+## 🚀 Ejecución
+
+### Desarrollo
+```bash
+streamlit run app.py
+```
+
+### Pruebas
+```bash
+# Ejecutar todas las pruebas
+python -m pytest tests/ -v
+
+# Ejecutar script de pruebas
+./scripts/run_tests.sh
+
+# Verificar estructura del proyecto
+python scripts/verify_structure.py
+```
+
+### Utilidades
+```bash
+# Actualizar colores para modo oscuro
+python scripts/update_colors.py
+
+# Selector interactivo de colores
+python scripts/color_selector.py
+```
+
+## 🎨 Características de la Interfaz
+
+### 🎯 Navegación Moderna
+- **Sidebar limpio** con información del usuario y navegación
+- **Páginas dinámicas** basadas en permisos de usuario
+- **Navegación fluida** con indicadores visuales
+- **Responsive design** para diferentes dispositivos
+
+### 📊 Filtros Inteligentes
+- **Notas**: Filtro por estado con "Pendiente" por defecto
+- **Vacaciones**: Filtros por estado de licencias (En Curso, Próximas, Transcurridas)
+- **Compensados**: Filtros por estado de compensatorios
+- **Tareas**: Filtros por estado y responsable
+
+### 🌙 Optimización para Modo Oscuro
+- **Colores optimizados** para excelente contraste
+- **Legibilidad mejorada** con texto blanco
+- **Paleta coherente** en todas las secciones
+- **Fácil alternancia** entre temas
+
+### 📱 Métricas en Tiempo Real
+- **Indicadores visuales** del estado de cada módulo
+- **Contadores automáticos** de registros
+- **Información contextual** sobre el estado de los datos
+
+## 🔐 Seguridad y Permisos
+
+### 👤 Roles de Usuario
+- **Admin**: Acceso completo a todas las funciones
+- **Empleado**: Acceso limitado a funciones relevantes
+- **Invitado**: Acceso de solo lectura
+
+### 🔒 Características de Seguridad
+- Autenticación con Google OAuth
+- Control de acceso basado en roles
+- Validación de datos en cliente y servidor
+- Protección contra inyección de código
+
+## 🧪 Testing
+
+### Suite de Pruebas Completa
+```bash
+# Tests unitarios
+python -m pytest tests/test_app.py -v
+
+# Tests de integración
+python -m pytest tests/test_google_sheets.py -v
+
+# Tests específicos de funcionalidad
+python -m pytest tests/test_notas_filter.py -v
+python -m pytest tests/test_vacaciones_filter.py -v
+python -m pytest tests/test_compensados_filter.py -v
+```
+
+### Cobertura de Pruebas
+- ✅ Autenticación y autorización
+- ✅ Navegación y permisos
+- ✅ Integración con Google Sheets
+- ✅ Filtros y búsqueda
+- ✅ Validación de datos
+- ✅ Manejo de errores
+
+## 📈 Estado del Proyecto
+
+### ✅ Completado
+- [x] Arquitectura multipágina moderna
+- [x] Sistema de autenticación y permisos
+- [x] Integración completa con Google Sheets
+- [x] Filtros inteligentes en todas las secciones
+- [x] Optimización para modo oscuro
+- [x] Suite completa de pruebas
+- [x] Documentación exhaustiva
+
+### 🚀 Próximas Mejoras
+- [ ] API REST para integración externa
+- [ ] Notificaciones push
+- [ ] Exportación avanzada de reportes
+- [ ] Dashboard ejecutivo
+- [ ] Módulo de proyectos colaborativos
+
+## 🤝 Contribuir
+
+1. Fork el proyecto
+2. Crea una rama para tu feature (`git checkout -b feature/AmazingFeature`)
+3. Commit tus cambios (`git commit -m 'Add some AmazingFeature'`)
+4. Push a la rama (`git push origin feature/AmazingFeature`)
+5. Abre un Pull Request
+
+## 📝 Licencia
+
+Este proyecto está bajo la Licencia MIT - ver el archivo `LICENSE` para más detalles.
+
+## 👥 Equipo de Desarrollo
+
+- **Desarrollador Principal**: [Tu Nombre]
+- **Arquitectura**: Streamlit + Google Sheets API
+- **Frontend**: Streamlit Components
+- **Backend**: Google Apps Script / Python
+
+## 📞 Soporte
+
+Para soporte técnico o consultas:
+- Crear un issue en GitHub
+- Contactar al equipo de desarrollo
+- Revisar la documentación en `docs/`
 
 ---
 
-## 📝 Notas Importantes
-
-- La aplicación utiliza la nueva arquitectura de Streamlit con `st.Page` y `st.navigation`
-- Cada página se ejecuta de forma independiente y carga sus propios datos
-- El control de acceso se realiza tanto a nivel de navegación como de funcionalidad
-- Los datos se almacenan en Google Sheets y se sincronizan automáticamente
-- La aplicación es responsive y funciona en dispositivos móviles
-
-> **Nota:** Asegúrate de configurar correctamente las credenciales de Google y los permisos de la hoja de cálculo antes de ejecutar la aplicación.
+**🎉 ¡Gracias por usar Gestor de Proyectos Streamlit!**  
+*Una solución moderna y eficiente para la gestión empresarial.*
