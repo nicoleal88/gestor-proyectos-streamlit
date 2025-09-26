@@ -49,7 +49,8 @@ def seccion_notas(client, personal_list):
         if not df_filtered.empty:
             for col in ['DNI', 'Teléfono']:
                 if col in df_filtered.columns:
-                    df_filtered[col] = df_filtered[col].astype(str).replace('nan', '')
+                    # Usar .loc para evitar SettingWithCopyWarning
+                    df_filtered.loc[:, col] = df_filtered[col].astype(str).replace('nan', '')
             def style_estado(estado):
                 if estado == 'Realizado': return 'color: #32CD32'
                 elif estado == 'Rechazado': return 'color: #FF6347'
@@ -80,7 +81,8 @@ def seccion_notas(client, personal_list):
 
     with modificar_nota:
         if not df_notas.empty:
-            df_notas['row_number'] = range(2, len(df_notas) + 2)
+            # Usar .loc para evitar SettingWithCopyWarning
+            df_notas.loc[:, 'row_number'] = range(2, len(df_notas) + 2)
             options = [f"Fila {row['row_number']}: {row['Motivo']} ({row['Remitente']})" for _, row in df_notas.iterrows()]
             option_to_edit = st.selectbox("Selecciona un registro", options=[""] + options)
             if option_to_edit:
