@@ -1,0 +1,24 @@
+module.exports = {
+    apps: [
+      {
+        name: 'gestor-proyectos',
+        script: '/home/ubuntu/gestor-proyectos-streamlit/venv/bin/python',
+        args: '-m streamlit run app.py --server.port=8502 --server.address=0.0.0.0 --server.headless true',
+        cwd: '/home/ubuntu/gestor-proyectos-streamlit',
+        interpreter: 'none',
+        watch: false,
+        instances: 1,
+        autorestart: true,
+        max_memory_restart: '1G',
+        combine_logs: true,
+        out_file: '/home/ubuntu/gestor-proyectos-streamlit/log/out.log',
+        error_file: '/home/ubuntu/gestor-proyectos-streamlit/log/err.log',
+        env: {
+          PYTHONPATH: '/home/ubuntu/gestor-proyectos-streamlit',
+          STREAMLIT_SERVER_HEADLESS: 'true',
+          STREAMLIT_SERVER_ENABLECORS: 'false',
+          STREAMLIT_SERVER_ENABLEXSRSFPROTECTION: 'false'
+        }
+      }
+    ]
+  };
