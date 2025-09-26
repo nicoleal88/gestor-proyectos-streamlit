@@ -83,11 +83,11 @@ def seccion_compensados(client, personal_list):
             end_date = pd.to_datetime(row['Hasta fecha']).date()
             style = ''
             if start_date <= today and end_date >= today:
-                style = 'background-color: lightblue'  # En curso (blue)
+                style = 'background-color: #1E90FF'  # En curso (blue)
             elif end_date < today:
-                style = 'background-color: lightgray'  # Ya ocurridas (gray)
+                style = 'background-color: #696969'  # Ya ocurridas (gray)
             elif start_date > today:
-                style = 'background-color: orange'  # Próximas (orange)
+                style = 'background-color: #FF8C00'  # Próximas (orange)
             return [style] * len(row)
 
         st.dataframe(

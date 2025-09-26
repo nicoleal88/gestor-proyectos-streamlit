@@ -85,11 +85,11 @@ def seccion_vacaciones(client, personal_list):
             last_vacation_day = (pd.to_datetime(row['Fecha regreso']) - pd.Timedelta(days=1)).date()
             style = ''
             if start_date <= today and last_vacation_day >= today:
-                style = 'background-color: lightblue'  # En curso (blue)
+                style = 'background-color: #1E90FF'  # En curso (blue)
             elif last_vacation_day < today:
-                style = 'background-color: lightgray'  # Ya ocurridas (gray)
+                style = 'background-color: #696969'  # Ya ocurridas (gray)
             elif start_date > today:
-                style = 'background-color: #FFD580'  # Próximas (light orange)
+                style = 'background-color: #FF8C00'  # Próximas (light orange)
             return [style] * len(row)
 
         # Crear una copia para mostrar, ajustando las fechas según lo necesario

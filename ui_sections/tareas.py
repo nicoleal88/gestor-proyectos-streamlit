@@ -13,7 +13,7 @@ from google_sheets_client import get_sheet, refresh_data, get_sheet_data
 def highlight_overdue(row):
     deadline = pd.to_datetime(row['Fecha límite'], errors='coerce').date()
     today = datetime.now().date()
-    return ['background-color: #ffcccc'] * len(row) if pd.notna(deadline) and deadline < today and row['Estado'] != 'Finalizada' else [''] * len(row)
+    return ['background-color: #8B0000'] * len(row) if pd.notna(deadline) and deadline < today and row['Estado'] != 'Finalizada' else [''] * len(row)
 
 # --- FUNCIONES PARA COMENTARIOS Y REPORTES ---
 def generar_reporte_markdown(task_data, comments_df):
@@ -88,11 +88,11 @@ def seccion_tareas(client, personal_list):
         if not df_tasks.empty:
             def style_estado(estado):
                 if estado == 'Finalizada':
-                    return 'color: green'
+                    return 'color: #32CD32'
                 elif estado == 'En curso':
-                    return 'color: blue'
+                    return 'color: #0066CC'
                 elif estado == 'Pendiente':
-                    return 'color: orange'
+                    return 'color: #FF8C00'
                 return ''
             col1, col2 = st.columns(2)
             status_options = df_tasks['Estado'].unique().tolist()

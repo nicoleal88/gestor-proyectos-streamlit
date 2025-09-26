@@ -51,9 +51,9 @@ def seccion_notas(client, personal_list):
                 if col in df_filtered.columns:
                     df_filtered[col] = df_filtered[col].astype(str).replace('nan', '')
             def style_estado(estado):
-                if estado == 'Realizado': return 'color: green'
-                elif estado == 'Rechazado': return 'color: red'
-                elif estado == 'Pendiente': return 'color: orange'
+                if estado == 'Realizado': return 'color: #32CD32'
+                elif estado == 'Rechazado': return 'color: #FF6347'
+                elif estado == 'Pendiente': return 'color: #FFD700'
                 return ''
             st.dataframe(df_filtered.style.map(style_estado, subset=['Estado']), width='stretch', hide_index=True)
         else:
