@@ -12,3 +12,6 @@ ToDo.md
 .streamlit
 
 pages/__pycache__/*
+
+ecosystem.config.js
+log/
