@@ -173,8 +173,8 @@ pm2 restart ecosystem.config.js
 # Logs de PM2
 pm2 logs gestor-proyectos
 
-# Logs del sistema
-tail -f /var/log/gestor_proyectos_deploy.log
+# Logs del sistema (nueva ubicación)
+tail -f logs/deploy.log
 
 # Logs de la aplicación
 tail -f logs/combined.log

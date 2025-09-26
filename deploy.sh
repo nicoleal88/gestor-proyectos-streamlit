@@ -6,14 +6,18 @@
 set -e  # Salir si hay error
 
 BRANCH=${1:-main}
-LOG_FILE="/var/log/gestor_proyectos_deploy.log"
+# Usar directorio del proyecto para logs en lugar de /var/log
+LOG_FILE="$(dirname "$0")/logs/deploy.log"
 
-echo "$(date): 🚀 Iniciando deployment simplificado con PM2..." | tee -a "$LOG_FILE"
+echo "$(date): 🚀 Iniciando deployment simplificado con PM2..." | tee "$LOG_FILE"
 
 # Función para loguear
 log() {
     echo "$(date): $1" | tee -a "$LOG_FILE"
 }
+
+# Crear directorio de logs si no existe
+mkdir -p "$(dirname "$LOG_FILE")"
 
 # Verificar si estamos en un repositorio git
 if ! git rev-parse --git-dir > /dev/null 2>&1; then

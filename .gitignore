@@ -13,4 +13,9 @@ ToDo.md
 
 pages/__pycache__/*
 
+ecosystem.config.js
 log/
+
+# Deployment logs (no subir al repositorio)
+logs/deploy.log
+logs/*.log
