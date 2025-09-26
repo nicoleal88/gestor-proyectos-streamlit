@@ -32,7 +32,13 @@ def seccion_notas(client, personal_list):
     with vista_general:
         if not df_notas.empty:
             status_options = df_notas['Estado'].unique().tolist()
-            selected_statuses = st.multiselect("Filtrar por Estado", options=status_options)
+            # Establecer "Pendiente" como valor por defecto si existe
+            default_status = ["Pendiente"] if "Pendiente" in status_options else status_options[:1] if status_options else []
+            selected_statuses = st.multiselect(
+                "Filtrar por Estado",
+                options=status_options,
+                default=default_status
+            )
             if selected_statuses:
                 df_filtered = df_notas[df_notas['Estado'].isin(selected_statuses)]
             else:

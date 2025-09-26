@@ -13,14 +13,26 @@ ROLES_PERMISOS = {
 
 # Mapeo de páginas a sus permisos requeridos
 PAGE_PERMISSIONS = {
-    '00_🏠_Inicio': 'inicio',
-    '01_✅_Tareas': 'tareas',
-    '02_📅_Vacaciones': 'vacaciones',
-    '03_⏱️_Compensados': 'compensados',
-    '04_📝_Notas': 'notas',
-    '05_🔔_Recordatorios': 'recordatorios',
-    '06_📆_Calendario': 'calendario',
-    '07_👥_Horarios': 'horarios'
+    '00_Inicio': 'inicio',
+    '01_Tareas': 'tareas',
+    '02_Vacaciones': 'vacaciones',
+    '03_Compensados': 'compensados',
+    '04_Notas': 'notas',
+    '05_Recordatorios': 'recordatorios',
+    '06_Calendario': 'calendario',
+    '07_Horarios': 'horarios'
+}
+
+# Mapeo de páginas a sus emojis para el sidebar
+PAGE_ICONS = {
+    '00_Inicio': '🏠',
+    '01_Tareas': '✅',
+    '02_Vacaciones': '📅',
+    '03_Compensados': '⏱️',
+    '04_Notas': '📝',
+    '05_Recordatorios': '🔔',
+    '06_Calendario': '📆',
+    '07_Horarios': '👥'
 }
 
 def obtener_rol_usuario(email: str) -> str:
@@ -122,19 +134,24 @@ def main():
             pages.append(st.Page(
                 page_func,
                 title=display_name,
-                icon=page_name.split('_')[1] if len(page_name.split('_')) > 1 else None
+                icon=PAGE_ICONS.get(page_name, None),
+                url_path=page_name.lower().replace('_', '-')
             ))
     
     # Mostrar navegación y ejecutar la página seleccionada
     if pages:
+        # Sidebar: Información del usuario y navegación
         with st.sidebar:
             st.markdown(f"## **Usuario:** {st.user.name}")
             st.markdown(f"**Rol:** {rol_usuario.capitalize()}")
             st.button("Cerrar sesión", on_click=st.logout)
             st.markdown("---")
-            
-            # Mostrar navegación y obtener la página seleccionada
-            selected_page = st.navigation(pages).run()
+
+            # Mostrar navegación en el sidebar
+            selected_page = st.navigation(pages)
+
+        # Área principal: Ejecutar la página seleccionada
+        selected_page.run()
     else:
         st.error("No hay páginas disponibles para tu rol. Contacta al administrador.")
 

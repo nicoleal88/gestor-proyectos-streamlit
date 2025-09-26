@@ -127,14 +127,14 @@ gestor_proyectos_streamlit/
 ├── google_sheets_client.py   # Cliente para integración con Google Sheets
 ├── requirements.txt          # Dependencias del proyecto
 ├── pages/                    # Directorio con las páginas de la aplicación
-│   ├── 00_🏠_Inicio.py       # Página de bienvenida
-│   ├── 01_✅_Tareas.py       # Gestión de tareas
-│   ├── 02_📅_Vacaciones.py   # Registro de vacaciones
-│   ├── 03_⏱️_Compensados.py # Control de horas compensadas
-│   ├── 04_📝_Notas.py        # Sistema de notas
-│   ├── 05_🔔_Recordatorios.py # Recordatorios
-│   ├── 06_📆_Calendario.py   # Calendario de eventos
-│   └── 07_👥_Horarios.py     # Gestión de horarios
+│   ├── 00_Inicio.py          # Página de bienvenida
+│   ├── 01_Tareas.py          # Gestión de tareas
+│   ├── 02_Vacaciones.py      # Registro de vacaciones
+│   ├── 03_Compensados.py     # Control de horas compensadas
+│   ├── 04_Notas.py           # Sistema de notas
+│   ├── 05_Recordatorios.py   # Recordatorios
+│   ├── 06_Calendario.py      # Calendario de eventos
+│   └── 07_Horarios.py        # Gestión de horarios
 ├── ui_sections/              # Módulos de la interfaz de usuario
 │   ├── bienvenida.py
 │   ├── tareas.py
