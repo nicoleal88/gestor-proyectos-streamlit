@@ -149,7 +149,7 @@ def main():
             st.markdown("---")
 
             # Mostrar información de versión
-            display_simple_version_sidebar()
+            display_simple_version_sidebar(rol_usuario)
 
             st.markdown("---")
 
