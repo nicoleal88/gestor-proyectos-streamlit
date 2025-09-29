@@ -10,6 +10,18 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 import streamlit as st
 import pandas as pd
 from streamlit_calendar import calendar
+ 
+# Zona horaria fija: Argentina (independiente de la ubicación del servidor)
+try:
+    from zoneinfo import ZoneInfo  # Python 3.9+
+    ARG_TZ = ZoneInfo("America/Argentina/Buenos_Aires")
+except Exception:
+    try:
+        import pytz  # fallback si no está disponible zoneinfo
+        ARG_TZ = pytz.timezone("America/Argentina/Buenos_Aires")
+    except Exception:
+        # Último recurso: offset fijo UTC-3 (sin cambios por DST)
+        ARG_TZ = timezone(timedelta(hours=-3))
 
 def get_google_calendar_events(ical_url, days_ahead=365):
     """Obtiene eventos de un calendario de Google a través de su URL iCal.
@@ -32,11 +44,11 @@ def get_google_calendar_events(ical_url, days_ahead=365):
         gcal = Calendar.from_ical(response.text)
         
         # Configurar el rango de fechas para eventos recurrentes
-        today = datetime.now()
+        today = datetime.now(ARG_TZ)
         max_date = today + timedelta(days=days_ahead)
         
-        # Obtener la zona horaria local
-        local_tz = today.astimezone().tzinfo
+        # Usar siempre la zona horaria de Argentina
+        local_tz = ARG_TZ
         
         # Obtener todos los eventos en el rango de fechas
         ical_events = recurring_ical_events.of(gcal).between(
@@ -224,7 +236,7 @@ def seccion_calendario(client):
         df_personal = st.session_state.get("df_personal", pd.DataFrame())
         if not df_personal.empty and 'Fecha de nacimiento' in df_personal.columns:
             df_personal['Fecha de nacimiento'] = pd.to_datetime(df_personal['Fecha de nacimiento'], errors='coerce', dayfirst=True)
-            today = datetime.now()
+            today = datetime.now(ARG_TZ)
             for _, row in df_personal.iterrows():
                 if pd.notna(row['Fecha de nacimiento']):
                     cumple_actual = row['Fecha de nacimiento'].replace(year=today.year)
@@ -247,6 +259,8 @@ def seccion_calendario(client):
         },
         "initialView": "timeGridWeek",
         "locale": "es",
+        # Forzar el uso de la zona horaria de Argentina en FullCalendar
+        "timeZone": "America/Argentina/Buenos_Aires",
     }
 
     calendar(events=st.session_state.calendar_events, options=calendar_options, key="calendar")
