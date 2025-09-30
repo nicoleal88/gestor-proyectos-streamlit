@@ -7,7 +7,7 @@ from version_manager import display_simple_version_sidebar
 
 # Mapeo de roles a permisos
 ROLES_PERMISOS = {
-    'admin': ['inicio', 'tareas', 'vacaciones', 'compensados', 'eventos', 'notas', 'recordatorios', 'calendario', 'horarios'],
+    'admin': ['inicio', 'tareas', 'vacaciones', 'compensados', 'eventos', 'notas', 'recordatorios', 'calendario', 'horarios', 'utilidades'],
     'empleado': ['inicio', 'tareas', 'vacaciones'],
     'secretaria': ['inicio', 'vacaciones', 'compensados', 'horarios'],
     'invitado': ['inicio']
@@ -23,7 +23,7 @@ PAGE_PERMISSIONS = {
     '05_Recordatorios': 'recordatorios',
     '06_Calendario': 'calendario',
     '07_Horarios': 'horarios',
-    '10_Utilidades_Carga_y_Merge': 'horarios'
+    '10_Utilidades_Carga_y_Merge': 'utilidades'
 }
 
 # Mapeo de páginas a sus emojis para el sidebar

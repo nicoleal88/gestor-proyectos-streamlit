@@ -581,21 +581,27 @@ def seccion_horarios(client, personal_list):
 
     if not files_list:
         st.warning("No se encontraron CSV en la carpeta configurada de Google Drive.")
-    else:
-        # Auto-cargar todos los CSV en el primer render para evitar clicks extra
-        if not st.session_state.get('drive_autoload_done'):
-            st.session_state['drive_to_load_ids'] = ids.copy()
-            st.session_state['drive_autoload_done'] = True
 
-    selected_indices = st.multiselect(
-        "Selecciona uno o más CSV de la carpeta",
-        options=list(range(len(names))),
-        format_func=lambda i: display_names[i],
-        key='drive_multiselect_indices'
-    ) if files_list else []
+    # Layout: multiselect a la izquierda, botón a la derecha
+    col_left, col_right = st.columns([3, 1])
 
-    if st.button("Cargar seleccionados", use_container_width=False, key='drive_load_btn') and selected_indices:
-        st.session_state['drive_to_load_ids'] = [ids[i] for i in selected_indices]
+    with col_left:
+        selected_indices = st.multiselect(
+            "Selecciona uno o más CSV de la carpeta",
+            options=list(range(len(names))),
+            format_func=lambda i: display_names[i],
+            key='drive_multiselect_indices'
+        ) if files_list else []
+
+    with col_right:
+        # Espacio para alinear con el contenido del multiselect (incluyendo label)
+        st.write(" ")
+        st.write(" ")
+        cargar_button = st.button("Cargar seleccionados", use_container_width=True, key='drive_load_btn')
+        if cargar_button and selected_indices:
+            st.session_state['drive_to_load_ids'] = [ids[i] for i in selected_indices]
+            # Forzar recarga marcando como no procesados
+            st.session_state['drive_processed_ids'] = None
     
     # Traer datos previos si existen
     df_registros = st.session_state.get('df_registros_horarios')
