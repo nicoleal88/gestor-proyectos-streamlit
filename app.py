@@ -9,6 +9,7 @@ from version_manager import display_simple_version_sidebar
 ROLES_PERMISOS = {
     'admin': ['inicio', 'tareas', 'vacaciones', 'compensados', 'eventos', 'notas', 'recordatorios', 'calendario', 'horarios'],
     'empleado': ['inicio', 'tareas', 'vacaciones'],
+    'secretaria': ['inicio', 'vacaciones', 'compensados', 'horarios'],
     'invitado': ['inicio']
 }
 
@@ -49,12 +50,15 @@ def obtener_rol_usuario(email: str) -> str:
     # Obtener listas de emails de los secrets
     admin_emails = st.secrets.get('roles', {}).get('admin_emails', [])
     empleado_emails = st.secrets.get('roles', {}).get('empleado_emails', [])
+    secretaria_emails = st.secrets.get('roles', {}).get('secretaria_emails', [])
     
     # Verificar el rol del usuario
     if email in admin_emails:
         return 'admin'
     elif email in empleado_emails:
         return 'empleado'
+    elif email in secretaria_emails:
+        return 'secretaria'
     else:
         return 'invitado'
 
