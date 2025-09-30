@@ -6,6 +6,16 @@ import warnings
 import re
 import numpy as np
 from datetime import datetime, timedelta
+from io import BytesIO
+
+# Imports opcionales para Google Drive (no rompen si no están instalados)
+try:
+    from google.oauth2 import service_account
+    from googleapiclient.discovery import build
+    from googleapiclient.http import MediaIoBaseDownload
+    HAS_GOOGLE_DRIVE = True
+except Exception:
+    HAS_GOOGLE_DRIVE = False
 
 warnings.filterwarnings("ignore", message=".*FontBBox.*")
 
@@ -154,6 +164,93 @@ def leer_pdf_query(path_pdf):
     except Exception as e:
         st.error(f"Error al abrir el archivo PDF: {str(e)}")
         return None
+
+# --- Integración con Google Drive (Service Account) ---
+@st.cache_resource
+def build_drive_client():
+    """
+    Construye un cliente de Google Drive v3 usando el archivo credenciales.json
+    ya utilizado por gspread. Requiere que las dependencias de Google estén instaladas.
+    """
+    if not HAS_GOOGLE_DRIVE:
+        return None
+    try:
+        creds = service_account.Credentials.from_service_account_file(
+            "credenciales.json",
+            scopes=["https://www.googleapis.com/auth/drive.readonly"],
+        )
+        service = build("drive", "v3", credentials=creds, cache_discovery=False)
+        return service
+    except FileNotFoundError:
+        st.warning("No se encontró 'credenciales.json' para Google Drive.")
+        return None
+    except Exception as e:
+        st.error(f"No fue posible inicializar el cliente de Google Drive: {e}")
+        return None
+
+@st.cache_data(show_spinner=False)
+def list_csvs_in_folder(folder_id: str):
+    """
+    Lista archivos CSV en una carpeta de Drive por su Folder ID.
+    Devuelve lista de dicts: [{id, name, size, modifiedTime, mimeType}]
+    """
+    service = build_drive_client()
+    if service is None:
+        return []
+    try:
+        files = []
+        page_token = None
+        query = (
+            f"'{folder_id}' in parents and trashed = false and "
+            "(mimeType = 'text/csv' or name contains '.csv')"
+        )
+        while True:
+            resp = service.files().list(
+                q=query,
+                fields="nextPageToken, files(id, name, size, modifiedTime, mimeType)",
+                pageToken=page_token,
+                orderBy="modifiedTime desc",
+            ).execute()
+            files.extend(resp.get("files", []))
+            page_token = resp.get("nextPageToken")
+            if not page_token:
+                break
+        return files
+    except Exception as e:
+        st.error(f"Error al listar archivos de Drive: {e}")
+        return []
+
+@st.cache_data(show_spinner=False)
+def download_csv_file(file_id: str) -> bytes:
+    """
+    Descarga el contenido de un archivo CSV de Drive por file_id y devuelve bytes.
+    """
+    service = build_drive_client()
+    if service is None:
+        return b""
+    try:
+        request = service.files().get_media(fileId=file_id)
+        buf = BytesIO()
+        downloader = MediaIoBaseDownload(buf, request)
+        done = False
+        while not done:
+            status, done = downloader.next_chunk()
+        return buf.getvalue()
+    except Exception as e:
+        st.error(f"Error al descargar archivo de Drive ({file_id}): {e}")
+        return b""
+
+def read_csv_bytes(content: bytes) -> pd.DataFrame:
+    """Lee bytes de CSV de manera robusta intentando distintos encodings."""
+    if not content:
+        return pd.DataFrame()
+    for enc in ("utf-8", "utf-8-sig", "latin-1"):
+        try:
+            df = pd.read_csv(BytesIO(content), encoding=enc)
+            return df
+        except Exception:
+            continue
+    return pd.DataFrame()
 
 def limpiar_nombre_empleado(nombre):
     """
@@ -455,96 +552,91 @@ def seccion_horarios(client, personal_list):
                                key='incognito_mode')
     # st.markdown("Carga tus archivos de texto y PDF para visualizar tendencias y patrones de asistencia.")
 
-    # Widgets para subir archivos
-    st.markdown("### Opción 1: Cargar archivos individuales")
-    col1, col2, col3 = st.columns(3)
-    archivo_subido = col1.file_uploader(
-        "Registros de Estación Central (.txt, .csv)",
-        type=['txt', 'csv'],
-        key='estacion_central'
-    )
-    archivo_pdf = col2.file_uploader(
-        "Registros de SDECo (.pdf)",
-        type=['pdf'],
-        key='sdeco_pdf'
-    )
-    archivo_excel = col3.file_uploader(
-        "Registros de Planilla (.xlsx)",
-        type=['xlsx'],
-        key='planilla_excel'
-    )
+    # Fuente única: Google Drive (carpeta fija)
+    st.markdown("### Archivos mensuales - Reloj + Libro")
+    if not HAS_GOOGLE_DRIVE:
+        st.info("Para usar esta opción instala: google-api-python-client, google-auth, google-auth-httplib2, google-auth-oauthlib")
+    DEFAULT_FOLDER_ID = "1mN0l4IOrsawz1p4p0K0OeHMm1dMe8RWS"
+
+    # Autolistado al entrar a la sección
+    if 'drive_csv_files' not in st.session_state:
+        st.session_state['drive_csv_files'] = list_csvs_in_folder(DEFAULT_FOLDER_ID)
+
+    files_list = st.session_state.get('drive_csv_files', [])
+    names = [f["name"] for f in files_list]
+    ids = [f["id"] for f in files_list]
+
+    # Extraer período (YYYY-MM) del nombre del archivo para mostrar
+    def extract_period(filename):
+        """Extrae el período YYYY-MM del nombre del archivo si existe."""
+        import re
+        # Buscar patrón YYYY-MM en el nombre del archivo
+        match = re.search(r'(\d{4}-\d{2})', filename)
+        if match:
+            return match.group(1)
+        # Si no encuentra el patrón, devolver el nombre completo sin extensión
+        return filename.rsplit('.', 1)[0] if '.' in filename else filename
+
+    display_names = [extract_period(name) for name in names]
+
+    if not files_list:
+        st.warning("No se encontraron CSV en la carpeta configurada de Google Drive.")
+    else:
+        # Auto-cargar todos los CSV en el primer render para evitar clicks extra
+        if not st.session_state.get('drive_autoload_done'):
+            st.session_state['drive_to_load_ids'] = ids.copy()
+            st.session_state['drive_autoload_done'] = True
+
+    selected_indices = st.multiselect(
+        "Selecciona uno o más CSV de la carpeta",
+        options=list(range(len(names))),
+        format_func=lambda i: display_names[i],
+        key='drive_multiselect_indices'
+    ) if files_list else []
+
+    if st.button("Cargar seleccionados", use_container_width=False, key='drive_load_btn') and selected_indices:
+        st.session_state['drive_to_load_ids'] = [ids[i] for i in selected_indices]
     
-    # Opción para cargar CSV exportado previamente
-    st.markdown("### O bien")
-    st.markdown("### Opción 2: Cargar archivo CSV exportado")
-    archivos_csv = st.file_uploader(
-        "Cargar archivo CSV exportado (puede seleccionar varios)",
-        type=['csv'],
-        accept_multiple_files=True,
-        key='csv_exportado'
-    )
-    
-    df_registros = None
+    # Traer datos previos si existen
+    df_registros = st.session_state.get('df_registros_horarios')
+    jornada_cached = st.session_state.get('jornada_horarios')
 
     # --- Carga y combinación de archivos ---
-    # Primero manejamos los archivos individuales
-    if archivo_subido is not None or archivo_pdf is not None or archivo_excel is not None:
-        if archivo_subido is not None:
-            df_registros, _ = cargar_y_procesar_datos(archivo_subido)
-
-        if archivo_pdf is not None:
-            import tempfile
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
-                tmp.write(archivo_pdf.read())
-                tmp_path = tmp.name
-            df_pdf = leer_pdf_query(tmp_path)
-            if df_registros is not None:
-                df_registros = pd.concat([df_registros, df_pdf], ignore_index=True)
-            else:
-                df_registros = df_pdf
-
-        if archivo_excel is not None:
-            df_excel = leer_excel_horarios(archivo_excel)
-            if df_registros is not None:
-                df_registros = pd.concat([df_registros, df_excel], ignore_index=True)
-            else:
-                df_registros = df_excel
-    
-    # Luego manejamos los archivos CSV (si se cargaron)
-    elif archivos_csv and len(archivos_csv) > 0:
+    # Procesamos CSV seleccionados desde Drive (solo si cambió la selección)
+    if st.session_state.get('drive_to_load_ids'):
+        # Procesar selección de Google Drive
         dfs_csv = []
-        for archivo_csv in archivos_csv:
-            try:
-                # Leer el archivo CSV
-                df_temp = pd.read_csv(archivo_csv)
-                
-                # Verificar si tiene las columnas necesarias
-                columnas_requeridas = ['id_empleado', 'fecha_hora', 'tipo']
-                if all(col in df_temp.columns for col in columnas_requeridas):
-                    # Convertir fecha_hora a datetime si es necesario
-                    if not pd.api.types.is_datetime64_any_dtype(df_temp['fecha_hora']):
-                        df_temp['fecha_hora'] = pd.to_datetime(df_temp['fecha_hora'])
-                    
-                    # Asegurarse de que id_empleado sea string
-                    df_temp['id_empleado'] = df_temp['id_empleado'].astype(str)
-                    
-                    # Extraer fecha de fecha_hora si no existe
-                    if 'fecha' not in df_temp.columns:
-                        df_temp['fecha'] = df_temp['fecha_hora'].dt.date
-                    
-                    dfs_csv.append(df_temp)
+        file_ids = list(st.session_state.get('drive_to_load_ids', []))
+        # Evitar reprocesar si ya procesamos exactamente estos IDs
+        if st.session_state.get('drive_processed_ids') == sorted(file_ids):
+            pass
+        else:
+            for fid in file_ids:
+                content = download_csv_file(fid)
+                df_temp = read_csv_bytes(content)
+                if not df_temp.empty:
+                    columnas_requeridas = ['id_empleado', 'fecha_hora', 'tipo']
+                    if all(col in df_temp.columns for col in columnas_requeridas):
+                        if not pd.api.types.is_datetime64_any_dtype(df_temp['fecha_hora']):
+                            df_temp['fecha_hora'] = pd.to_datetime(df_temp['fecha_hora'], errors='coerce')
+                        df_temp = df_temp.dropna(subset=['fecha_hora'])
+                        df_temp['id_empleado'] = df_temp['id_empleado'].astype(str)
+                        if 'fecha' not in df_temp.columns:
+                            df_temp['fecha'] = pd.to_datetime(df_temp['fecha_hora']).dt.date
+                        dfs_csv.append(df_temp)
+                    else:
+                        st.warning("Un CSV de Drive no tiene el formato esperado y se omitirá.")
                 else:
-                    st.warning(f"El archivo {archivo_csv.name} no tiene el formato esperado. Se omitirá.")
-            except Exception as e:
-                st.error(f"Error al procesar el archivo {archivo_csv.name}: {str(e)}")
-        
-        if dfs_csv:
-            df_registros = pd.concat(dfs_csv, ignore_index=True)
-            # No mostramos el mensaje de éxito, solo mantenemos el conteo en el estado de la sesión
-            st.session_state['csv_loaded'] = {
-                'count': len(dfs_csv),
-                'total_records': len(df_registros)
-            }
+                    st.warning("No se pudo leer un archivo CSV desde Drive.")
+            if dfs_csv:
+                df_registros = pd.concat(dfs_csv, ignore_index=True)
+                st.session_state['csv_loaded'] = {
+                    'count': len(dfs_csv),
+                    'total_records': len(df_registros)
+                }
+                # Persistir en session_state
+                st.session_state['df_registros_horarios'] = df_registros
+                st.session_state['drive_processed_ids'] = sorted(file_ids)
 
     if df_registros is not None and not df_registros.empty:
         # Separar los DataFrames por tipo
@@ -622,6 +714,9 @@ def seccion_horarios(client, personal_list):
         jornada.rename(columns={'min': 'inicio_jornada', 'max': 'fin_jornada'}, inplace=True)
         jornada = jornada[jornada['duracion_horas'] > 0.25]
 
+        # Guardar en session_state para persistencia entre reruns
+        st.session_state['jornada_horarios'] = jornada
+
         # Añadir columna de nombre completo según ID
         df_registros['nombre'] = df_registros['id_empleado'].apply(
             lambda x: get_employee_display(x, st.session_state.get('incognito_mode', False))
@@ -631,33 +726,33 @@ def seccion_horarios(client, personal_list):
         )
 
         # Mostrar mensaje de éxito y botón de descarga
-        col1, col2 = st.columns([1, 2])
-        with col1:
-            st.success("¡Archivos cargados y combinados con éxito!")
-        with col2:
-            # Crear un dataframe para la descarga (copiamos para no modificar el original)
-            df_descarga = df_registros.copy()
-            # Obtener el mes y año de los datos (usamos el primer registro como referencia)
-            if not df_descarga.empty and 'fecha' in df_descarga.columns:
-                fecha_ejemplo = pd.to_datetime(df_descarga['fecha'].iloc[0])
-                periodo = fecha_ejemplo.strftime('%Y-%m')
-            else:
-                periodo = 'sin_fecha'
+        # col1, col2 = st.columns([1, 2])
+        # with col1:
+        #     st.success("¡Archivos cargados y combinados con éxito!")
+        # with col2:
+        #     # Crear un dataframe para la descarga (copiamos para no modificar el original)
+        #     df_descarga = df_registros.copy()
+        #     # Obtener el mes y año de los datos (usamos el primer registro como referencia)
+        #     if not df_descarga.empty and 'fecha' in df_descarga.columns:
+        #         fecha_ejemplo = pd.to_datetime(df_descarga['fecha'].iloc[0])
+        #         periodo = fecha_ejemplo.strftime('%Y-%m')
+        #     else:
+        #         periodo = 'sin_fecha'
             
-            # Generar timestamp actual
-            timestamp = pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')
+        #     # Generar timestamp actual
+        #     timestamp = pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')
             
-            # Convertir a CSV
-            csv = df_descarga.to_csv(index=False, encoding='utf-8-sig')
+        #     # Convertir a CSV
+        #     csv = df_descarga.to_csv(index=False, encoding='utf-8-sig')
             
-            # Crear botón de descarga
-            st.download_button(
-                label="📥 Descargar datos completos (CSV)",
-                data=csv,
-                file_name=f"datos_horarios_{periodo}_{timestamp}.csv",
-                mime='text/csv',
-                help="Descarga los datos completos de horarios en formato CSV"
-            )
+        #     # Crear botón de descarga
+        #     st.download_button(
+        #         label="📥 Descargar datos completos (CSV)",
+        #         data=csv,
+        #         file_name=f"datos_horarios_{periodo}_{timestamp}.csv",
+        #         mime='text/csv',
+        #         help="Descarga los datos completos de horarios en formato CSV"
+        #     )
 
         # # --- Comparación de Horarios Libro vs Reloj ---
         # if 'tipo' in df_registros.columns and len(df_registros['tipo'].unique()) > 1:

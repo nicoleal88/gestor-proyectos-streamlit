@@ -21,7 +21,8 @@ PAGE_PERMISSIONS = {
     '04_Notas': 'notas',
     '05_Recordatorios': 'recordatorios',
     '06_Calendario': 'calendario',
-    '07_Horarios': 'horarios'
+    '07_Horarios': 'horarios',
+    '10_Utilidades_Carga_y_Merge': 'horarios'
 }
 
 # Mapeo de páginas a sus emojis para el sidebar
@@ -33,7 +34,8 @@ PAGE_ICONS = {
     '04_Notas': '📝',
     '05_Recordatorios': '🔔',
     '06_Calendario': '📆',
-    '07_Horarios': '👥'
+    '07_Horarios': '👥',
+    '10_Utilidades_Carga_y_Merge': '🧰'
 }
 
 def obtener_rol_usuario(email: str) -> str:
