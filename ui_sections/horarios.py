@@ -550,90 +550,76 @@ def seccion_horarios(client, personal_list):
     incognito_mode = st.checkbox("Modo incógnito (mostrar IDs en lugar de nombres)", 
                                value=st.session_state.get('incognito_mode', False),
                                key='incognito_mode')
-    # st.markdown("Carga tus archivos de texto y PDF para visualizar tendencias y patrones de asistencia.")
 
     # Fuente única: Google Drive (carpeta fija)
     st.markdown("### Archivos mensuales - Reloj + Libro")
     if not HAS_GOOGLE_DRIVE:
         st.info("Para usar esta opción instala: google-api-python-client, google-auth, google-auth-httplib2, google-auth-oauthlib")
+        return
+        
     DEFAULT_FOLDER_ID = "1mN0l4IOrsawz1p4p0K0OeHMm1dMe8RWS"
 
-    # Autolistado al entrar a la sección
-    if 'drive_csv_files' not in st.session_state:
-        st.session_state['drive_csv_files'] = list_csvs_in_folder(DEFAULT_FOLDER_ID)
-
+    # Limpiar caché al cargar la página
+    if 'drive_csv_files' not in st.session_state or 'df_registros_horarios' not in st.session_state:
+        st.session_state['drive_processed_ids'] = None
+        st.session_state['df_registros_horarios'] = None
+        st.session_state['jornada_horarios'] = None
+    
+    # Obtener lista de archivos del Drive
+    st.session_state['drive_csv_files'] = list_csvs_in_folder(DEFAULT_FOLDER_ID)
     files_list = st.session_state.get('drive_csv_files', [])
-    names = [f["name"] for f in files_list]
-    ids = [f["id"] for f in files_list]
-
-    # Extraer período (YYYY-MM) del nombre del archivo para mostrar
+    
+    if not files_list:
+        st.warning("No se encontraron archivos en la carpeta de Google Drive.")
+        return
+        
+    # Extraer período (YYYY-MM) del nombre del archivo
     def extract_period(filename):
         """Extrae el período YYYY-MM del nombre del archivo si existe."""
         import re
-        # Buscar patrón YYYY-MM en el nombre del archivo
         match = re.search(r'(\d{4}-\d{2})', filename)
-        if match:
-            return match.group(1)
-        # Si no encuentra el patrón, devolver el nombre completo sin extensión
-        return filename.rsplit('.', 1)[0] if '.' in filename else filename
+        return match.group(1) if match else filename.rsplit('.', 1)[0] if '.' in filename else filename
 
-    display_names = [extract_period(name) for name in names]
-
-    if not files_list:
-        st.warning("No se encontraron CSV en la carpeta configurada de Google Drive.")
-
-    # Layout: multiselect a la izquierda, botón a la derecha
-    col_left, col_right = st.columns([3, 1])
-
-    with col_left:
-        selected_indices = st.multiselect(
-            "Selecciona uno o más CSV de la carpeta",
-            options=list(range(len(names))),
-            format_func=lambda i: display_names[i],
-            key='drive_multiselect_indices'
-        ) if files_list else []
-
-    with col_right:
-        # Espacio para alinear con el contenido del multiselect (incluyendo label)
-        st.write(" ")
-        st.write(" ")
-        cargar_button = st.button("Cargar seleccionados", use_container_width=True, key='drive_load_btn')
-        if cargar_button and selected_indices:
-            st.session_state['drive_to_load_ids'] = [ids[i] for i in selected_indices]
-            # Forzar recarga marcando como no procesados
-            st.session_state['drive_processed_ids'] = None
+    # Cargar automáticamente todos los archivos
+    file_ids = [f["id"] for f in files_list]
+    display_names = [extract_period(f["name"]) for f in files_list]
+    
+    # Mostrar mensaje con los meses cargados
+    if display_names:
+        st.success(f"Se cargaron automáticamente {len(display_names)} períodos: {', '.join(sorted(display_names))}")
+    
+    # Establecer los IDs para cargar
+    st.session_state['drive_to_load_ids'] = file_ids
     
     # Traer datos previos si existen
     df_registros = st.session_state.get('df_registros_horarios')
     jornada_cached = st.session_state.get('jornada_horarios')
 
     # --- Carga y combinación de archivos ---
-    # Procesamos CSV seleccionados desde Drive (solo si cambió la selección)
-    if st.session_state.get('drive_to_load_ids'):
-        # Procesar selección de Google Drive
+    # Verificar si ya tenemos datos cargados y procesados
+    if 'drive_processed_ids' not in st.session_state or st.session_state.get('df_registros_horarios') is None:
+        # Procesar archivos de Google Drive
         dfs_csv = []
-        file_ids = list(st.session_state.get('drive_to_load_ids', []))
-        # Evitar reprocesar si ya procesamos exactamente estos IDs
-        if st.session_state.get('drive_processed_ids') == sorted(file_ids):
-            pass
-        else:
-            for fid in file_ids:
-                content = download_csv_file(fid)
-                df_temp = read_csv_bytes(content)
-                if not df_temp.empty:
-                    columnas_requeridas = ['id_empleado', 'fecha_hora', 'tipo']
-                    if all(col in df_temp.columns for col in columnas_requeridas):
-                        if not pd.api.types.is_datetime64_any_dtype(df_temp['fecha_hora']):
-                            df_temp['fecha_hora'] = pd.to_datetime(df_temp['fecha_hora'], errors='coerce')
-                        df_temp = df_temp.dropna(subset=['fecha_hora'])
-                        df_temp['id_empleado'] = df_temp['id_empleado'].astype(str)
-                        if 'fecha' not in df_temp.columns:
-                            df_temp['fecha'] = pd.to_datetime(df_temp['fecha_hora']).dt.date
-                        dfs_csv.append(df_temp)
-                    else:
-                        st.warning("Un CSV de Drive no tiene el formato esperado y se omitirá.")
-                else:
-                    st.warning("No se pudo leer un archivo CSV desde Drive.")
+        file_ids = st.session_state.get('drive_to_load_ids', [])
+        
+        with st.spinner('Cargando datos de Google Drive...'):
+            for i, fid in enumerate(file_ids):
+                try:
+                    content = download_csv_file(fid)
+                    df_temp = read_csv_bytes(content)
+                    if not df_temp.empty:
+                        columnas_requeridas = ['id_empleado', 'fecha_hora', 'tipo']
+                        if all(col in df_temp.columns for col in columnas_requeridas):
+                            if not pd.api.types.is_datetime64_any_dtype(df_temp['fecha_hora']):
+                                df_temp['fecha_hora'] = pd.to_datetime(df_temp['fecha_hora'], errors='coerce')
+                            df_temp = df_temp.dropna(subset=['fecha_hora'])
+                            df_temp['id_empleado'] = df_temp['id_empleado'].astype(str)
+                            if 'fecha' not in df_temp.columns:
+                                df_temp['fecha'] = pd.to_datetime(df_temp['fecha_hora']).dt.date
+                            dfs_csv.append(df_temp)
+                except Exception as e:
+                    st.warning(f"Error al procesar un archivo: {str(e)}")
+            
             if dfs_csv:
                 df_registros = pd.concat(dfs_csv, ignore_index=True)
                 st.session_state['csv_loaded'] = {
@@ -643,6 +629,15 @@ def seccion_horarios(client, personal_list):
                 # Persistir en session_state
                 st.session_state['df_registros_horarios'] = df_registros
                 st.session_state['drive_processed_ids'] = sorted(file_ids)
+            else:
+                st.error("No se pudieron cargar datos de los archivos.")
+                return
+    
+    # Obtener datos del session_state
+    df_registros = st.session_state.get('df_registros_horarios')
+    if df_registros is None or df_registros.empty:
+        st.warning("No hay datos disponibles para mostrar. Por favor, verifica los archivos en Google Drive.")
+        return
 
     if df_registros is not None and not df_registros.empty:
         # Separar los DataFrames por tipo
@@ -1044,10 +1039,22 @@ def seccion_horarios(client, personal_list):
                     lambda x: f"{dias_semana[x.weekday()]} {x.strftime('%d-%b-%Y')}"
                 )
                 
-                # Obtener datos de compensatorios para el empleado
+                # Obtener datos de compensatorios para el empleado y filtrar por mes seleccionado
                 df_compensatorios = obtener_compensatorios_por_fecha()
-                if not df_compensatorios.empty and empleado_seleccionado != 'Todos':
-                    df_compensatorios = df_compensatorios[df_compensatorios['id_empleado'] == empleado_seleccionado]
+                if not df_compensatorios.empty:
+                    # Filtrar por empleado si está seleccionado
+                    if empleado_seleccionado != 'Todos':
+                        df_compensatorios = df_compensatorios[df_compensatorios['id_empleado'] == empleado_seleccionado]
+                    
+                    # Filtrar por mes seleccionado
+                    if mes_seleccionado != 'Todos':
+                        # Convertir el mes seleccionado a datetime para comparación
+                        mes_seleccionado_dt = pd.to_datetime(mes_seleccionado)
+                        # Filtrar compensatorios que caigan en el mes seleccionado
+                        df_compensatorios = df_compensatorios[
+                            (df_compensatorios['fecha_dt'].dt.month == mes_seleccionado_dt.month) &
+                            (df_compensatorios['fecha_dt'].dt.year == mes_seleccionado_dt.year)
+                        ]
                 
                 # Asegurarse de que tenemos la columna 'tipo' correcta (puede ser 'tipo_x' o 'tipo_y')
                 tipo_col = 'tipo_x' if 'tipo_x' in df_plot.columns else 'tipo_y' if 'tipo_y' in df_plot.columns else 'tipo'
@@ -1134,6 +1141,19 @@ def seccion_horarios(client, personal_list):
                 # Crear una copia del DataFrame para no modificar el original
                 df_plot = df_completo.copy()
                 
+                # Calcular el espaciado de ticks basado en el número de fechas
+                fechas_unicas = sorted(df_plot['fecha'].unique())
+                n_fechas = len(fechas_unicas)
+                
+                # Mostrar una etiqueta cada cierta cantidad de días dependiendo de cuántas fechas hay
+                if n_fechas > 30:  # Si hay muchas fechas, mostrar una cada 7 días
+                    step = max(1, n_fechas // 15)  # Asegurar al menos 1 y aproximadamente 15 etiquetas
+                    tick_vals = fechas_unicas[::step]
+                    tick_text = [f"{pd.to_datetime(d).strftime('%d/%m')}" for d in tick_vals]
+                else:
+                    tick_vals = fechas_unicas
+                    tick_text = [f"{pd.to_datetime(d).strftime('%d/%m')}" for d in tick_vals]
+                
                 # Crear el gráfico de barras agrupado
                 fig_historial = px.bar(
                     df_plot,
@@ -1141,7 +1161,7 @@ def seccion_horarios(client, personal_list):
                     y='duracion_horas',
                     color='tipo_combinado',
                     barmode='group',  # Esto coloca las barras una al lado de la otra
-                    title=f'Comparación de horas trabajadas por día',
+                    title='Comparación de horas trabajadas por día',
                     labels={
                         'fecha': 'Fecha', 
                         'duracion_horas': 'Horas Trabajadas',
@@ -1153,11 +1173,42 @@ def seccion_horarios(client, personal_list):
                         'COMPENSATORIO': '#9b59b6'  # Violeta para COMPENSATORIO
                     },
                     category_orders={
-                        'fecha': sorted(df_plot['fecha'].unique()),
+                        'fecha': fechas_unicas,
                         'tipo_combinado': ["LIBRO", "RELOJ", "COMPENSATORIO"]
                     },
                     template='plotly_white',
                     custom_data=['fecha_formateada', 'tipo_combinado', 'es_salida_campo']
+                )
+                
+                # Configurar el diseño del gráfico
+                fig_historial.update_layout(
+                    xaxis={
+                        'type': 'category',
+                        'categoryorder': 'array',
+                        'categoryarray': fechas_unicas,
+                        'tickangle': -45,
+                        'tickmode': 'array',
+                        'tickvals': tick_vals,
+                        'ticktext': tick_text,
+                        'tickfont': {'size': 10}  # Reducir tamaño de fuente
+                    },
+                    margin=dict(l=20, r=20, t=40, b=100),  # Ajustar márgenes para consistencia
+                    yaxis=dict(
+                        showgrid=True,
+                        gridcolor='lightgray',
+                        gridwidth=0.5,
+                        title_text='Horas Trabajadas',
+                        fixedrange=False
+                    ),
+                    plot_bgcolor='rgba(0,0,0,0)',
+                    legend_title='Tipo de Registro',
+                    legend=dict(
+                        orientation="h",
+                        yanchor="bottom",
+                        y=1.02,
+                        xanchor="right",
+                        x=1
+                    )
                 )
                 
                 # Configurar los bordes de las barras
@@ -1275,7 +1326,7 @@ def seccion_horarios(client, personal_list):
                     annotations=[
                         dict(
                             x=0.5,
-                            y=-0.2,
+                            y=-0.18,
                             showarrow=False,
                             text="Días resaltados en rojo indican posible salida al campo (2 registros de reloj y más de 7 horas trabajadas)",
                             xref="paper",
@@ -1323,10 +1374,6 @@ def seccion_horarios(client, personal_list):
                     
                     # Contar cuántas diferencias válidas hay
                     diferencias_validas = mask.sum()
-                    if diferencias_validas == 0:
-                        st.warning("No hay días con ambos valores de LIBRO y RELOJ mayores a cero para calcular diferencias.")
-                    else:
-                        st.success(f"Se calcularon diferencias para {diferencias_validas} días con ambos valores de LIBRO y RELOJ.")
                     
                     # Verificar si hay registros impares para cada fecha
                     df_diferencias['tiene_impares'] = False
@@ -1345,139 +1392,164 @@ def seccion_horarios(client, personal_list):
                                 if any(conteo_registros.loc[fecha] % 2 != 0):
                                     df_diferencias.loc[df_diferencias['fecha'] == fecha, 'tiene_impares'] = True
                     
-                    # Crear la columna para el color basado en la diferencia y si hay impares
-                    def get_color(row):
-                        if row['tiene_impares']:
-                            return 'Registros impares'
-                        elif row['diferencia'] > 0:
-                            return 'Positiva'
-                        elif row['diferencia'] < 0:
-                            return 'Negativa'
+                    # Si no hay diferencias válidas, mostrar mensaje pero continuar con el resto del código
+                    if diferencias_validas == 0:
+                        st.warning("No hay días con ambos valores de LIBRO y RELOJ mayores a cero para calcular diferencias.")
+                        sin_diferencias_validas = True
+                    else:
+                        st.success(f"Se calcularon diferencias para {diferencias_validas} días con ambos valores de LIBRO y RELOJ.")
+                        sin_diferencias_validas = False
+                    
+                    # Solo mostrar el gráfico y métricas si hay diferencias válidas
+                    if not sin_diferencias_validas:
+                        # Crear la columna para el color basado en la diferencia y si hay impares
+                        def get_color(row):
+                            if row['tiene_impares']:
+                                return 'Registros impares'
+                            elif row['diferencia'] > 0:
+                                return 'Positiva'
+                            elif row['diferencia'] < 0:
+                                return 'Negativa'
+                            else:
+                                return 'Cero'
+                        
+                        df_diferencias['tipo_diferencia'] = df_diferencias.apply(get_color, axis=1)
+                        
+                        # Filtrar días sin registros impares para las estadísticas
+                        df_sin_impares = df_diferencias[~df_diferencias['tiene_impares']]
+                        total_dias = len(df_diferencias)
+                        dias_con_impares = df_diferencias['tiene_impares'].sum()
+                        
+                        # Crear el gráfico de barras para las diferencias
+                        fig_diferencias = px.bar(
+                            df_diferencias,
+                            x='fecha',
+                            y='diferencia',
+                            color='tipo_diferencia',
+                            title='Diferencia entre horas LIBRO y RELOJ (LIBRO - RELOJ)',
+                            labels={
+                                'fecha': 'Fecha',
+                                'diferencia': 'Diferencia (horas)',
+                                'tipo_diferencia': 'Tipo de Diferencia'
+                            },
+                            color_discrete_map={
+                                'Positiva': '#2ecc71',
+                                'Negativa': '#e74c3c',
+                                'Cero': '#7f8c8d',
+                                'Registros impares': '#f39c12'
+                            },
+                            category_orders={
+                                'fecha': sorted(df_diferencias['fecha'].unique())
+                            },
+                            template='plotly_white'
+                        )
+                        
+                        # Configurar el diseño del gráfico
+                        # Calcular el espaciado de ticks basado en el número de fechas
+                        fechas_unicas = sorted(df_diferencias['fecha'].unique())
+                        n_fechas = len(fechas_unicas)
+                        
+                        # Mostrar una etiqueta cada cierta cantidad de días dependiendo de cuántas fechas hay
+                        if n_fechas > 30:  # Si hay muchas fechas, mostrar una cada 7 días
+                            step = max(1, n_fechas // 15)  # Asegurar al menos 1 y aproximadamente 15 etiquetas
+                            tick_vals = fechas_unicas[::step]
+                            tick_text = [f"{pd.to_datetime(d).strftime('%d/%m')}" for d in tick_vals]
                         else:
-                            return 'Cero'
-                    
-                    df_diferencias['tipo_diferencia'] = df_diferencias.apply(get_color, axis=1)
-                    
-                    # Filtrar días sin registros impares para las estadísticas
-                    df_sin_impares = df_diferencias[~df_diferencias['tiene_impares']]
-                    total_dias = len(df_diferencias)
-                    dias_con_impares = df_diferencias['tiene_impares'].sum()
-                    
-                    # Crear el gráfico de barras para las diferencias
-                    fig_diferencias = px.bar(
-                        df_diferencias,
-                        x='fecha',
-                        y='diferencia',
-                        color='tipo_diferencia',
-                        title='Diferencia entre horas LIBRO y RELOJ (LIBRO - RELOJ)',
-                        labels={
-                            'fecha': 'Fecha',
-                            'diferencia': 'Diferencia (horas)',
-                            'tipo_diferencia': 'Tipo de Diferencia'
-                        },
-                        color_discrete_map={
-                            'Positiva': '#2ecc71',
-                            'Negativa': '#e74c3c',
-                            'Cero': '#7f8c8d',
-                            'Registros impares': '#f39c12'
-                        },
-                        category_orders={
-                            'fecha': sorted(df_diferencias['fecha'].unique())
-                        },
-                        template='plotly_white'
-                    )
-                    
-                    # Configurar el diseño del gráfico
-                    fig_diferencias.update_layout(
-                        xaxis={
-                            'type': 'category',
-                            'categoryorder': 'array',
-                            'categoryarray': sorted(df_diferencias['fecha'].unique()),
-                            'tickangle': -45,
-                            'tickmode': 'array',
-                            'tickvals': df_diferencias['fecha'].unique(),
-                            'ticktext': [f"{d.strftime('%d/%m')}" for d in pd.to_datetime(df_diferencias['fecha'].unique())]
-                        },
-                        yaxis=dict(
-                            showgrid=True,
-                            gridcolor='lightgray',
-                            gridwidth=0.5,
-                            title_text='Diferencia (horas)',
-                            range=[-1, 1],  # Establecer rango fijo de -1 a 1
-                            fixedrange=False  # Evitar zoom/desplazamiento
-                        ),
-                        legend_title='Tipo de Diferencia',
-                        legend=dict(
-                            orientation="h",
-                            yanchor="bottom",
-                            y=1.02,
-                            xanchor="right",
-                            x=1
-                        ),
-                        margin=dict(l=20, r=20, t=40, b=20),
-                        plot_bgcolor='rgba(0,0,0,0)',
-                        paper_bgcolor='rgba(0,0,0,0)',
-                        height=400,
-                        showlegend=True
-                    )
-                    
-                    # Configurar el hover
-                    fig_diferencias.update_traces(
-                        hovertemplate='<b>%{x|%d/%m/%Y}</b><br>Diferencia: %{y:.2f} horas<extra></extra>',
-                        width=0.4,
-                        marker=dict(
-                            line=dict(
-                                width=1,
-                                color='DarkSlateGrey'
+                            tick_vals = fechas_unicas
+                            tick_text = [f"{pd.to_datetime(d).strftime('%d/%m')}" for d in tick_vals]
+                        
+                        fig_diferencias.update_layout(
+                            xaxis={
+                                'type': 'category',
+                                'categoryorder': 'array',
+                                'categoryarray': fechas_unicas,
+                                'tickangle': -45,
+                                'tickmode': 'array',
+                                'tickvals': tick_vals,
+                                'ticktext': tick_text,
+                                'tickfont': {'size': 10}  # Reducir tamaño de fuente
+                            },
+                            margin=dict(l=20, r=20, t=40, b=100),  # Margen aumentado para las etiquetas
+                            yaxis=dict(
+                                showgrid=True,
+                                gridcolor='lightgray',
+                                gridwidth=0.5,
+                                title_text='Diferencia (horas)',
+                                range=[-1, 1],
+                                fixedrange=False
+                            ),
+                            legend_title='Tipo de Diferencia',
+                            legend=dict(
+                                orientation="h",
+                                yanchor="bottom",
+                                y=1.02,
+                                xanchor="right",
+                                x=1
+                            ),
+                            plot_bgcolor='rgba(0,0,0,0)',
+                            paper_bgcolor='rgba(0,0,0,0)',
+                            height=400,
+                            showlegend=True
+                        )
+                        
+                        # Configurar el hover
+                        fig_diferencias.update_traces(
+                            hovertemplate='<b>%{x|%d/%m/%Y}</b><br>Diferencia: %{y:.2f} horas<extra></extra>',
+                            width=0.4,
+                            marker=dict(
+                                line=dict(
+                                    width=1,
+                                    color='DarkSlateGrey'
+                                )
                             )
                         )
-                    )
-                    
-                    # Añadir línea horizontal en 0
-                    fig_diferencias.add_hline(
-                        y=0,
-                        line_dash="solid",
-                        line_color="black",
-                        opacity=0.7
-                    )
-                    
-                    # Mostrar el gráfico
-                    st.plotly_chart(fig_diferencias, use_container_width=True)
-                    
-                    # Mostrar métricas
-                    col1, col2, col3, col4, col5 = st.columns(5)
-                    
-                    # Filtrar solo las diferencias válidas (no nulas)
-                    diferencias_validas = df_sin_impares['diferencia'].dropna()
-                    
-                    with col1:
-                        if not diferencias_validas.empty:
-                            # Calcular promedio solo con diferencias válidas
-                            promedio = diferencias_validas.mean()
-                            st.metric("Diferencia promedio", f"{promedio:+.2f} horas")
-                        else:
-                            st.metric("Diferencia promedio", "N/A")
-                            
-                    with col5:
-                        if not diferencias_validas.empty:
-                            # Calcular suma acumulada de diferencias
-                            suma_acumulada = diferencias_validas.sum()
-                            st.metric("Diferencia acumulada", f"{suma_acumulada:+.2f} horas")
-                        else:
-                            st.metric("Diferencia acumulada", "N/A")
-                    with col2:
-                        if not df_sin_impares.empty:
-                            st.metric("Máx. diferencia positiva", f"{df_sin_impares['diferencia'].max():.2f} horas")
-                        else:
-                            st.metric("Máx. diferencia positiva", "N/A")
-                    with col3:
-                        if not df_sin_impares.empty:
-                            st.metric("Máx. diferencia negativa", f"{df_sin_impares['diferencia'].min():.2f} horas")
-                        else:
-                            st.metric("Máx. diferencia negativa", "N/A")
-                    with col4:
-                        st.metric("Días con registros impares", f"{dias_con_impares} de {total_dias}", 
-                               delta=None, delta_color="inverse" if dias_con_impares > 0 else "normal")
+                        
+                        # Añadir línea horizontal en 0
+                        fig_diferencias.add_hline(
+                            y=0,
+                            line_dash="solid",
+                            line_color="black",
+                            opacity=0.7
+                        )
+                        
+                        # Mostrar el gráfico
+                        st.plotly_chart(fig_diferencias, use_container_width=True)
+                        
+                        # Mostrar métricas
+                        col1, col2, col3, col4, col5 = st.columns(5)
+                        
+                        # Filtrar solo las diferencias válidas (no nulas)
+                        diferencias_validas_metricas = df_sin_impares['diferencia'].dropna()
+                        
+                        with col1:
+                            if not diferencias_validas_metricas.empty:
+                                promedio = diferencias_validas_metricas.mean()
+                                st.metric("Diferencia promedio", f"{promedio:+.2f} horas")
+                            else:
+                                st.metric("Diferencia promedio", "-")
+                                
+                        with col5:
+                            if not diferencias_validas_metricas.empty:
+                                suma_acumulada = diferencias_validas_metricas.sum()
+                                st.metric("Diferencia acumulada", f"{suma_acumulada:+.2f} horas")
+                            else:
+                                st.metric("Diferencia acumulada", "-")
+                                
+                        with col2:
+                            if not diferencias_validas_metricas.empty:
+                                st.metric("Máx. diferencia positiva", f"{diferencias_validas_metricas.max():.2f} horas")
+                            else:
+                                st.metric("Máx. diferencia positiva", "-")
+                                
+                        with col3:
+                            if not diferencias_validas_metricas.empty:
+                                st.metric("Máx. diferencia negativa", f"{diferencias_validas_metricas.min():.2f} horas")
+                            else:
+                                st.metric("Máx. diferencia negativa", "-")
+                                
+                        with col4:
+                            st.metric("Días con registros impares", f"{dias_con_impares} de {total_dias}", 
+                                   delta=None, delta_color="inverse" if dias_con_impares > 0 else "normal")
             else:
                 st.info("No hay datos para mostrar en el historial de jornadas para este filtro.")
             
@@ -1488,8 +1560,9 @@ def seccion_horarios(client, personal_list):
             col1, col2 = st.columns(2)
             
             with col1:
-                # Boxplot para LIBRO
-                df_libro = df_completo[df_completo['tipo_combinado'] == 'LIBRO']
+                # Boxplot para LIBRO - excluyendo días con 0 horas
+                df_libro = df_completo[(df_completo['tipo_combinado'] == 'LIBRO') & 
+                                     (df_completo['duracion_horas'] > 0)]
                 if not df_libro.empty:
                     fig_box_libro = px.box(
                         df_libro,
@@ -1518,8 +1591,9 @@ def seccion_horarios(client, personal_list):
                     st.warning("No hay datos de LIBRO para mostrar")
             
             with col2:
-                # Boxplot para RELOJ
-                df_reloj = df_completo[df_completo['tipo_combinado'] == 'RELOJ']
+                # Boxplot para RELOJ (excluyendo horas trabajadas = 0)
+                df_reloj = df_completo[(df_completo['tipo_combinado'] == 'RELOJ') & 
+                                     (df_completo['duracion_horas'] > 0)]
                 if not df_reloj.empty:
                     fig_box_reloj = px.box(
                         df_reloj,
@@ -1630,9 +1704,9 @@ def seccion_horarios(client, personal_list):
                                     unsafe_allow_html=True
                                 )
             # --- Mostrar los DataFrames completos al final de la página (solo en modo desarrollador) ---
-            if st.checkbox("Mostrar datos completos (modo desarrollador)"):
-                st.header("Datos completos")
-                st.subheader("Registros originales")
-                st.dataframe(df_registros)
-                st.subheader("Jornadas calculadas")
-                st.dataframe(jornada)
+            # if st.checkbox("Mostrar datos completos (modo desarrollador)"):
+            #     st.header("Datos completos")
+            #     st.subheader("Registros originales")
+            #     st.dataframe(df_registros)
+            #     st.subheader("Jornadas calculadas")
+            #     st.dataframe(jornada)
