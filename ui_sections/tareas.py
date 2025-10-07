@@ -150,7 +150,7 @@ def seccion_tareas(client, personal_list):
                     'Título Tarea': st.column_config.Column(disabled=True),
                     'Tarea': st.column_config.Column(disabled=True),
                     'Responsable': st.column_config.Column(disabled=True),
-                    'Fecha límite': st.column_config.DateColumn(format="DD/MM/YYYY", disabled=True),
+                    'Fecha límite': st.column_config.DateColumn(format="DD/MM/YYYY", disabled=False),
                     'Estado': st.column_config.SelectboxColumn(
                         options=["Pendiente", "En curso", "Finalizada"],
                         required=True,
@@ -161,23 +161,41 @@ def seccion_tareas(client, personal_list):
 
             # Detectar cambios y actualizar la hoja de cálculo
             if not edited_df.equals(st.session_state['df_tasks_display']):
-                # Encontrar las filas que han cambiado
-                diff_df = edited_df.merge(st.session_state['df_tasks_display'], indicator=True, how='outer')
-                changed_rows = diff_df[diff_df['_merge'] == 'left_only']
+                try:
+                    comparison_df = st.session_state['df_tasks_display'].compare(edited_df)
+                    if not comparison_df.empty:
+                        for index, row in comparison_df.iterrows():
+                            task_id = st.session_state['df_tasks_display'].loc[index, 'ID']
+                            changes_made = False
 
-                for _, row in changed_rows.iterrows():
-                    task_id = row['ID']
-                    new_status = row['Estado']
-                    
-                    # Actualizar Google Sheet
-                    success = update_cell_by_id(client, sheet_name, task_id, 'Estado', new_status)
-                    if success:
-                        st.toast(f"Estado de la tarea {task_id} actualizado a '{new_status}'.")
-                        # Refrescar los datos y reiniciar para ver los cambios
-                        refresh_data(client, sheet_name)
-                        st.rerun()
-                    else:
-                        st.error(f"No se pudo actualizar el estado de la tarea {task_id}.")
+                            # Verificar cambio de estado
+                            if ('Estado', 'other') in row:
+                                new_status = row[('Estado', 'other')]
+                                if pd.notna(new_status):
+                                    success = update_cell_by_id(client, sheet_name, task_id, 'Estado', new_status)
+                                    if success:
+                                        st.toast(f"Estado de la tarea {task_id} actualizado a '{new_status}'.")
+                                        changes_made = True
+                                    else:
+                                        st.error(f"No se pudo actualizar el estado de la tarea {task_id}.")
+                            
+                            # Verificar cambio de fecha límite
+                            if ('Fecha límite', 'other') in row:
+                                new_date = row[('Fecha límite', 'other')]
+                                # gspread espera un string, no un objeto de fecha
+                                new_date_str = pd.to_datetime(new_date).strftime('%Y-%m-%d') if pd.notna(new_date) else ""
+                                success = update_cell_by_id(client, sheet_name, task_id, 'Fecha límite', new_date_str)
+                                if success:
+                                    st.toast(f"Fecha límite de la tarea {task_id} actualizada.")
+                                    changes_made = True
+                                else:
+                                    st.error(f"No se pudo actualizar la fecha límite de la tarea {task_id}.")
+
+                        if changes_made:
+                            refresh_data(client, sheet_name)
+                            st.rerun()
+                except Exception as e:
+                    st.error(f"Ocurrió un error al procesar los cambios: {e}")
         else:
             st.info("No hay tareas registradas.")
 
