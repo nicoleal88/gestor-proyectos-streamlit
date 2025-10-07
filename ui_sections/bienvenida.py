@@ -150,34 +150,173 @@ def get_exchange_rates(base_currency='USD', target_currencies=['ARS', 'EUR', 'BR
         st.error(f"Error al obtener tasas de cambio: {e}")
     return None
 
-@st.cache_data(ttl=600)  # Cache por 10 minutos
+@st.cache_data(ttl=3600)  # Cache por 1 hora
 def obtener_tipo_cambio() -> Optional[Dict[str, Dict[str, float]]]:
-    """Obtiene los tipos de cambio de DolarAPI"""
+    """Obtiene los tipos de cambio de ArgentinaDatos API y DolarAPI (para el euro)"""
     try:
-        # Obtener datos del dólar oficial y blue
-        response = requests.get("https://dolarapi.com/v1/dolares/oficial")
-        oficial = response.json()
+        # Obtener datos actuales (últimos 7 días)
+        end_date = datetime.now()
+        start_date = end_date - pd.Timedelta(days=7)
         
-        response = requests.get("https://dolarapi.com/v1/dolares/blue")
-        blue = response.json()
+        # Formatear fechas para la API
+        def format_date(dt):
+            return dt.strftime('%Y/%m/%d')
         
-        response = requests.get("https://dolarapi.com/v1/cotizaciones/eur")
-        euro = response.json()
+        # Obtener datos para cada tipo de cambio
+        def obtener_datos(casa):
+            try:
+                # Obtener datos para hoy
+                hoy = format_date(end_date)
+                response = requests.get(
+                    f"https://api.argentinadatos.com/v1/cotizaciones/dolares/{casa}/{hoy}",
+                    timeout=10
+                )
+                if response.status_code == 200:
+                    data = response.json()
+                    # Verificar si la respuesta es una lista y tiene datos
+                    if isinstance(data, list) and len(data) > 0:
+                        return data[0]  # Devolver el primer elemento de la lista
+                    elif isinstance(data, dict):
+                        return data  # Si es un diccionario, devolverlo directamente
+                    else:
+                        st.warning(f"Formato de datos inesperado para {casa}")
+                else:
+                    st.warning(f"Error al obtener datos para {casa}: HTTP {response.status_code}")
+                return None
+            except requests.exceptions.RequestException as e:
+                st.error(f"Error de conexión al obtener datos para {casa}: {str(e)}")
+            except Exception as e:
+                st.error(f"Error inesperado al obtener datos para {casa}: {str(e)}")
+            return None
+        
+        # Obtener datos históricos para calcular variación
+        def obtener_historico(casa, dias=7):
+            historico = []
+            for i in range(dias):
+                try:
+                    fecha = end_date - pd.Timedelta(days=i)
+                    fecha_str = format_date(fecha)
+                    response = requests.get(
+                        f"https://api.argentinadatos.com/v1/cotizaciones/dolares/{casa}/{fecha_str}",
+                        timeout=10
+                    )
+                    
+                    if response.status_code == 200:
+                        data = response.json()
+                        if isinstance(data, list) and len(data) > 0:
+                            # Asegurarse de que el dato tenga la fecha
+                            dato = data[0]
+                            if 'fecha' not in dato:
+                                dato['fecha'] = fecha_str
+                            historico.append(dato)
+                        elif isinstance(data, dict):
+                            if 'fecha' not in data:
+                                data['fecha'] = fecha_str
+                            historico.append(data)
+                except requests.exceptions.RequestException as e:
+                    st.warning(f"No se pudo obtener histórico para {casa} ({fecha_str}): {str(e)}")
+                except Exception as e:
+                    st.warning(f"Error procesando histórico para {casa} ({fecha_str}): {str(e)}")
+            
+            # Ordenar por fecha (más antigua primero)
+            historico_ordenado = sorted(historico, key=lambda x: x.get('fecha', ''))
+            return historico_ordenado
+        
+        # Obtener datos actuales desde dolarapi.com
+        def obtener_dolarapi(casa):
+            try:
+                response = requests.get(f"https://dolarapi.com/v1/dolares/{casa}", timeout=10)
+                if response.status_code == 200:
+                    data = response.json()
+                    # Asegurarse de que el dato tenga la fecha
+                    if 'fecha' not in data:
+                        data['fecha'] = format_date(datetime.now())
+                    return data
+                return None
+            except Exception as e:
+                st.warning(f"No se pudo obtener datos actuales para {casa} desde dolarapi.com: {str(e)}")
+                return None
+        
+        # Obtener datos actuales
+        oficial = obtener_dolarapi('oficial')
+        blue = obtener_dolarapi('blue')
+        
+        # Obtener histórico desde ArgentinaDatos (excluyendo el día actual)
+        hist_oficial = obtener_historico('oficial')
+        hist_blue = obtener_historico('blue')
+        
+        # Agregar datos actuales al histórico si están disponibles
+        if oficial and hist_oficial:
+            # Verificar que no esté ya en el histórico
+            hoy = format_date(datetime.now())
+            if not any(d.get('fecha', '').startswith(hoy.split('T')[0]) for d in hist_oficial):
+                hist_oficial.append(oficial)
+        
+        if blue and hist_blue:
+            hoy = format_date(datetime.now())
+            if not any(d.get('fecha', '').startswith(hoy.split('T')[0]) for d in hist_blue):
+                hist_blue.append(blue)
+        
+        # Obtener datos del euro desde dolarapi.com
+        def obtener_euro():
+            try:
+                response = requests.get("https://dolarapi.com/v1/cotizaciones/eur", timeout=10)
+                if response.status_code == 200:
+                    data = response.json()
+                    # Asegurarse de que el dato tenga la fecha
+                    if 'fecha' not in data:
+                        data['fecha'] = format_date(datetime.now())
+                    return data
+                return None
+            except Exception as e:
+                st.error(f"Error al obtener datos del euro: {str(e)}")
+                return None
+        
+        euro_data = obtener_euro()
+        
+        # Función auxiliar para calcular variación
+        def calcular_variacion(historico):
+            if len(historico) < 2:
+                return 0.0
+            
+            # Ordenar por fecha (más reciente primero)
+            historico_ordenado = sorted(historico, key=lambda x: x.get('fecha', ''), reverse=True)
+            
+            # Obtener el valor de hoy y ayer
+            valor_actual = historico_ordenado[0].get('venta', 0) if historico_ordenado else 0
+            valor_anterior = historico_ordenado[1].get('venta', 0) if len(historico_ordenado) > 1 else 0
+            
+            if valor_anterior == 0:
+                return 0.0
+                
+            return ((valor_actual - valor_anterior) / valor_anterior) * 100
         
         return {
             'oficial': {
-                'compra': oficial.get('compra', 0),
-                'venta': oficial.get('venta', 0),
+                'compra': oficial.get('compra', 0) if oficial else 0,
+                'venta': oficial.get('venta', 0) if oficial else 0,
+                'variacion': calcular_variacion(hist_oficial) if hist_oficial else 0,
+                'historico_compra': [d.get('compra', 0) for d in hist_oficial if 'compra' in d],
+                'historico_venta': [d.get('venta', 0) for d in hist_oficial if 'venta' in d],
+                'fechas': [d.get('fecha', '').split('T')[0] for d in hist_oficial if 'fecha' in d],
                 'timestamp': datetime.now().timestamp()
             },
             'blue': {
-                'compra': blue.get('compra', 0),
-                'venta': blue.get('venta', 0),
+                'compra': blue.get('compra', 0) if blue else 0,
+                'venta': blue.get('venta', 0) if blue else 0,
+                'variacion': calcular_variacion(hist_blue) if hist_blue else 0,
+                'historico_compra': [d.get('compra', 0) for d in hist_blue if 'compra' in d],
+                'historico_venta': [d.get('venta', 0) for d in hist_blue if 'venta' in d],
+                'fechas': [d.get('fecha', '').split('T')[0] for d in hist_blue if 'fecha' in d],
                 'timestamp': datetime.now().timestamp()
             },
             'euro': {
-                'compra': euro.get('compra', 0),
-                'venta': euro.get('venta', 0),
+                'compra': euro_data.get('compra', 0) if euro_data else 0,
+                'venta': euro_data.get('venta', 0) if euro_data else 0,
+                'variacion': 0,  # No mostramos variación para el euro
+                'historico_compra': [],
+                'historico_venta': [],
+                'fechas': [],
                 'timestamp': datetime.now().timestamp()
             }
         }
@@ -334,28 +473,181 @@ def mostrar_seccion_bienvenida():
     st.markdown("### 💰 Cotizaciones")
     
     if tipos_cambio:
-        col1, col2, col3 = st.columns(3)
+        col1, col2, col3 = st.columns([1, 1, 2])
+        
+        # Función auxiliar para mostrar una tarjeta de cotización
+        def mostrar_cotizacion(moneda, nombre, historico_key):
+            variacion = tipos_cambio[historico_key]['variacion']
+            color = 'red' if variacion > 0 else 'green' if variacion < 0 else 'gray'
+            
+                # No mostramos el gráfico pequeño aquí, lo haremos más abajo
+            
+            # Mostrar métricas con variación
+            st.metric(
+                label=f"**{nombre} - Compra**",
+                value=f"${tipos_cambio[historico_key]['compra']:,.2f}",
+                delta=f"{variacion:+.2f}%" if variacion != 0 else None,
+                delta_color="normal"
+            )
+            
+            st.metric(
+                label=f"**{nombre} - Venta**",
+                value=f"${tipos_cambio[historico_key]['venta']:,.2f}",
+                delta=None
+            )
         
         with col1:
-            st.markdown("#### **Dólar Oficial**")
-            st.metric(label="Compra", value=f"${tipos_cambio['oficial']['compra']:,.2f}")
-            st.metric(label="Venta", value=f"${tipos_cambio['oficial']['venta']:,.2f}")
-        
-        # with col2:
-        #     st.markdown("#### **Dólar Blue**")
-        #     st.metric(label="Compra", value=f"${tipos_cambio['blue']['compra']:,.2f}")
-        #     st.metric(label="Venta", value=f"${tipos_cambio['blue']['venta']:,.2f}")
+            mostrar_cotizacion("USD", "Dólar Oficial", "oficial")
         
         with col2:
-            st.markdown("#### **Euro Oficial**")
-            st.metric(label="Compra", value=f"${tipos_cambio['euro']['compra']:,.2f}")
-            st.metric(label="Venta", value=f"${tipos_cambio['euro']['venta']:,.2f}")
+            mostrar_cotizacion("EUR", "Euro Oficial", "euro")
         
-        # with col3:
-            
+        # Gráfico de tendencia más grande en la tercera columna
+        with col3:
+            st.markdown("#### Tendencias (últimos 7 días)")
+            # Verificar que tengamos datos históricos de compra para al menos un tipo de cambio
+            if any(len(tipos_cambio[key].get('historico_compra', [])) > 1 for key in ['oficial', 'blue']):
+                fig_tendencia = go.Figure()
+                
+                # Agregar líneas para cada tipo de cambio
+                for key, color, name in [
+                    ('oficial', '#ff7f0e', 'Dólar Oficial'),  # Naranja para el oficial
+                    ('blue', '#1f77b4', 'Dólar Blue')         # Azul para el blue
+                ]:
+                    # Verificar que tengamos datos históricos de compra y venta
+                    if (len(tipos_cambio[key].get('historico_compra', [])) > 1 and 
+                        len(tipos_cambio[key].get('historico_venta', [])) > 1 and
+                        len(tipos_cambio[key].get('fechas', [])) > 1):
+                        # Línea de compra
+                        fig_tendencia.add_trace(go.Scatter(
+                            x=tipos_cambio[key]['fechas'],
+                            y=tipos_cambio[key]['historico_compra'],
+                            name=f'{name} - Compra',
+                            line=dict(
+        color=color, 
+        width=2.5, 
+        dash='dash',
+        shape='spline',
+        smoothing=1.3
+    ),
+    mode='lines+markers',
+    marker=dict(
+        size=5, 
+        symbol='circle',
+        line=dict(width=1.5, color='white'),
+        opacity=0.9
+    )
+                        ))
+                        
+                        # Línea de venta
+                        fig_tendencia.add_trace(go.Scatter(
+                            x=tipos_cambio[key]['fechas'],
+                            y=tipos_cambio[key]['historico_venta'],
+                            name=f'{name} - Venta',
+                            line=dict(
+        color=color, 
+        width=2.5,
+        shape='spline',
+        smoothing=1.3
+    ),
+    mode='lines+markers',
+    marker=dict(
+        size=5, 
+        symbol='circle',
+        line=dict(width=1.5, color='white'),
+        opacity=0.9
+    )
+                        ))
+                
+                # Obtener el rango de valores para el eje Y con un margen del 5%
+                all_values = []
+                for key in ['oficial', 'blue']:
+                    if len(tipos_cambio[key].get('historico_compra', [])) > 0:
+                        all_values.extend(tipos_cambio[key]['historico_compra'])
+                        all_values.extend(tipos_cambio[key]['historico_venta'])
+                
+                if all_values:
+                    min_val = min(all_values)
+                    max_val = max(all_values)
+                    margin = (max_val - min_val) * 0.05  # 5% de margen
+                    y_range = [max(0, min_val - margin), max_val + margin]
+                else:
+                    y_range = None
+                
+                # Configuración del diseño del gráfico
+                fig_tendencia.update_layout(
+                    height=300,
+                    margin=dict(l=60, r=30, t=50, b=50) ,
+                    legend=dict(
+                        orientation='h',
+                        yanchor='bottom',
+                        y=1.02,
+                        xanchor='center',
+                        x=0.5,
+                        font=dict(size=10)
+                    ),
+                    xaxis=dict(
+                        showgrid=True,
+                        gridcolor='rgba(200, 200, 200, 0.15)' ,
+                        tickangle=-45,
+                        tickformat='%a %d/%m',  # Formato: Mar 08/10
+                        title='',
+                        title_font=dict(size=12),
+                        showline=True,
+                        linecolor='rgba(0,0,0,0.1)',
+                        tickfont=dict(size=10)
+                    ),
+                    yaxis=dict(
+                        showgrid=True,
+                        gridcolor='rgba(200, 200, 200, 0.15)' ,
+                        title='Precio (ARS)',
+                        title_font=dict(size=12),
+                        tickprefix='$',
+                        tickformat=',.0f',
+                        range=y_range,  # Usar el rango calculado
+                        showline=True,
+                        linecolor='rgba(0,0,0,0.1)',
+                        tickfont=dict(size=10)
+                    ),
+                    hovermode='x unified',
+                    plot_bgcolor='rgba(15, 15, 15, 0.9)' ,
+                    paper_bgcolor='rgba(0,0,0,0)',
+                    showlegend=True,
+                    hoverlabel=dict(
+                        bgcolor='rgba(255, 255, 255, 0.95)',
+                        font_size=12,
+                        font_family='Arial'
+                    )
+                )
+                
+                # Configurar tooltips con estilo consistente
+                fig_tendencia.update_traces(
+                    hovertemplate='<span style="font-size: 13px; font-weight: bold;">%{x|%A %d/%m}</span><br>' +
+                                '<span style="font-size: 12px;">Precio: <b>$%{y:,.2f} ARS</b></span><br>' +
+                                '<extra></extra>'
+                )
+                
+                # Asegurar que el fondo del tooltip sea oscuro y el texto claro
+                fig_tendencia.update_layout(
+                    hoverlabel=dict(
+                        bgcolor='rgba(30, 30, 30, 0.9)',
+                        font_size=12,
+                        font_family='Arial',
+                        bordercolor='rgba(150, 150, 150, 0.5)',
+                        font_color='white',
+                        align='left'
+                    )
+                )
+                
+                st.plotly_chart(fig_tendencia, use_container_width=True, config={'displayModeBar': True})
         
         # Mostrar última actualización
-        st.markdown(f"<div style='text-align: center;'><small>Última actualización: {datetime.now().strftime('%d/%m/%Y %H:%M')}</small></div>", unsafe_allow_html=True)
+        st.markdown(
+            f"<div style='text-align: right; font-size: 0.8em; color: #666; margin-top: -10px;'>"
+            f"Última actualización: {datetime.now().strftime('%d/%m/%Y %H:%M')}"
+            "</div>",
+            unsafe_allow_html=True
+        )
     else:
         st.warning("No se pudieron cargar los tipos de cambio")
     
