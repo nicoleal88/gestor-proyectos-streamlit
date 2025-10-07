@@ -7,7 +7,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 import streamlit as st
 import pandas as pd
 from datetime import datetime
-from google_sheets_client import get_sheet, refresh_data, get_sheet_data
+from google_sheets_client import get_sheet, refresh_data, get_sheet_data, update_cell_by_id
 
 # --- FUNCIONES AUXILIARES ---
 def highlight_overdue(row):
@@ -137,17 +137,47 @@ def seccion_tareas(client, personal_list):
             else:
                 df_display['Comentarios'] = ''
             
-            # Mostrar el dataframe con la nueva columna
-            st.dataframe(
-                df_display.style.apply(highlight_overdue, axis=1)
-                               .map(style_estado, subset=['Estado']), 
-                width='stretch', 
+            # Guardar el dataframe original en el estado de la sesión para comparar cambios
+            st.session_state['df_tasks_display'] = df_display.copy()
+
+            edited_df = st.data_editor(
+                df_display,
+                key="data_editor_tasks",
+                width='stretch',
                 hide_index=True,
                 column_config={
-                    'Fecha límite': st.column_config.DateColumn(format="DD/MM/YYYY"),
-                    'Comentarios': st.column_config.TextColumn(width='large')
+                    'ID': st.column_config.Column(disabled=True),
+                    'Título Tarea': st.column_config.Column(disabled=True),
+                    'Tarea': st.column_config.Column(disabled=True),
+                    'Responsable': st.column_config.Column(disabled=True),
+                    'Fecha límite': st.column_config.DateColumn(format="DD/MM/YYYY", disabled=True),
+                    'Estado': st.column_config.SelectboxColumn(
+                        options=["Pendiente", "En curso", "Finalizada"],
+                        required=True,
+                    ),
+                    'Comentarios': st.column_config.TextColumn(width='large', disabled=True)
                 }
             )
+
+            # Detectar cambios y actualizar la hoja de cálculo
+            if not edited_df.equals(st.session_state['df_tasks_display']):
+                # Encontrar las filas que han cambiado
+                diff_df = edited_df.merge(st.session_state['df_tasks_display'], indicator=True, how='outer')
+                changed_rows = diff_df[diff_df['_merge'] == 'left_only']
+
+                for _, row in changed_rows.iterrows():
+                    task_id = row['ID']
+                    new_status = row['Estado']
+                    
+                    # Actualizar Google Sheet
+                    success = update_cell_by_id(client, sheet_name, task_id, 'Estado', new_status)
+                    if success:
+                        st.toast(f"Estado de la tarea {task_id} actualizado a '{new_status}'.")
+                        # Refrescar los datos y reiniciar para ver los cambios
+                        refresh_data(client, sheet_name)
+                        st.rerun()
+                    else:
+                        st.error(f"No se pudo actualizar el estado de la tarea {task_id}.")
         else:
             st.info("No hay tareas registradas.")
 

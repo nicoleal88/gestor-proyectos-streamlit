@@ -55,3 +55,39 @@ def refresh_data(client, sheet_name):
     """Refresca los datos de una hoja específica en el estado de la sesión."""
     st.session_state[f"df_{sheet_name.lower()}"] = get_sheet_data(client, sheet_name)
     st.cache_data.clear()
+
+def update_cell_by_id(client, sheet_name, id_to_find, column_name, new_value):
+    """Actualiza una celda específica buscando por ID y nombre de columna."""
+    sheet = get_sheet(client, sheet_name)
+    if not sheet:
+        return False
+    try:
+        df = get_sheet_data(client, sheet_name)
+        if df.empty or 'ID' not in df.columns:
+            st.error(f"La hoja '{sheet_name}' no tiene una columna 'ID' o está vacía.")
+            return False
+
+        # Asegurarse de que el tipo de dato del ID es consistente
+        df['ID'] = df['ID'].astype(str)
+        id_to_find = str(id_to_find)
+
+        row_index = df[df['ID'] == id_to_find].index
+        if not row_index.any():
+            st.warning(f"No se encontró ninguna fila con ID '{id_to_find}' en '{sheet_name}'.")
+            return False
+
+        # gspread usa índices basados en 1, y la primera fila es la cabecera
+        row_to_update = row_index[0] + 2
+
+        headers = sheet.row_values(1)
+        if column_name not in headers:
+            st.error(f"La columna '{column_name}' no existe en la hoja '{sheet_name}'.")
+            return False
+        
+        col_to_update = headers.index(column_name) + 1
+
+        sheet.update_cell(row_to_update, col_to_update, new_value)
+        return True
+    except Exception as e:
+        st.error(f"Error al actualizar la celda en Google Sheets: {e}")
+        return False
