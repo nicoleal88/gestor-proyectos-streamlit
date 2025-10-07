@@ -277,7 +277,8 @@ def mostrar_seccion_bienvenida():
             # Crear gráfico combinado de lluvia y viento
             dias = [datetime.fromtimestamp(dia.get('dt', 0)).strftime('%a %d/%m') for dia in pronostico]
             lluvia = [dia.get('pop', 0) * 100 for dia in pronostico]  # Probabilidad de lluvia en %
-            viento = [dia.get('wind_speed', 0) for dia in pronostico]  # Velocidad del viento en m/s
+            # Obtener ráfagas de viento y convertir de m/s a km/h
+            viento = [dia.get('wind_gust', dia.get('wind_speed', 0)) * 3.6 for dia in pronostico]
             
             fig_lluvia_viento = go.Figure()
             
@@ -294,7 +295,7 @@ def mostrar_seccion_bienvenida():
             fig_lluvia_viento.add_trace(go.Scatter(
                 x=dias,
                 y=viento,
-                name='Viento (km/h)',
+                name='Ráfagas (km/h)',
                 line=dict(color='orange', width=2),
                 yaxis='y2'
             ))
@@ -309,7 +310,7 @@ def mostrar_seccion_bienvenida():
                     showgrid=False
                 ),
                 yaxis2=dict(
-                    title='Viento (km/h)',
+                    title='Ráfagas de viento (km/h)',
                     title_font=dict(color='orange'),
                     tickfont=dict(color='orange'),
                     anchor='x',
