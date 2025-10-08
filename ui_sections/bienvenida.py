@@ -325,8 +325,6 @@ def obtener_tipo_cambio() -> Optional[Dict[str, Dict[str, float]]]:
         return None
 
 def mostrar_seccion_bienvenida():
-    st.title("Bienvenido al Gestor de Proyectos")
-    
     # Obtener fecha y hora actual
     now = datetime.now(pytz.timezone('America/Argentina/Buenos_Aires'))
     
@@ -338,7 +336,6 @@ def mostrar_seccion_bienvenida():
         fecha = formatear_fecha_espanol(now, formato='completo')
     
     st.subheader(f"📅 {fecha}")
-    st.markdown("---")
 
     # Obtener el clima actual
     weather = get_weather()
@@ -469,7 +466,6 @@ def mostrar_seccion_bienvenida():
             st.warning("No se pudo cargar el pronóstico de lluvia y viento")
     
     # Mostrar tipos de cambio en una fila separada
-    st.markdown("---")
     st.markdown("### 💰 Cotizaciones")
     
     if tipos_cambio:

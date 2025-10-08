@@ -113,8 +113,6 @@ def get_google_calendar_events(ical_url, days_ahead=365):
         return []
 
 def seccion_calendario(client):
-    st.subheader("🗓️ Calendario Unificado")
-
     if "calendar_events" not in st.session_state:
         st.session_state.calendar_events = []
         

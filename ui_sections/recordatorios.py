@@ -10,14 +10,12 @@ from datetime import datetime
 from google_sheets_client import get_sheet, refresh_data
 
 def seccion_recordatorios(client, personal_list):
-    st.subheader("🔔 Recordatorios Importantes")
     sheet_name = "Recordatorios"
     df_recordatorios = st.session_state.df_recordatorios
     sheet = get_sheet(client, sheet_name)
     if sheet is None: return
 
     st.metric("Total de Recordatorios", len(df_recordatorios))
-    st.markdown("---")
 
     vista_general, agregar_eliminar = st.tabs(["📊 Vista General", "➕ Agregar / 🗑️ Eliminar"])
 

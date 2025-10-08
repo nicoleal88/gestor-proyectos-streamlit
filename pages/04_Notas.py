@@ -3,6 +3,9 @@ from google_sheets_client import connect_to_google_sheets
 from ui_sections.notas import seccion_notas
 
 def page():
+    st.set_page_config(page_title="Notas", page_icon="📝")
+    st.title("📝 Notas")
+
     client = connect_to_google_sheets()
     if client:
         personal_list = []

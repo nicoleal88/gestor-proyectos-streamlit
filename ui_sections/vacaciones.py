@@ -10,7 +10,6 @@ from datetime import datetime
 from google_sheets_client import get_sheet, refresh_data
 
 def seccion_vacaciones(client, personal_list):
-    st.subheader("📅 Registro de Licencias y Vacaciones")
     sheet_name = "Vacaciones"
     df_vacaciones = st.session_state.df_vacaciones
     sheet = get_sheet(client, sheet_name)
@@ -35,7 +34,6 @@ def seccion_vacaciones(client, personal_list):
         col3.metric("Próximas Licencias", proximas_total)
         col4.metric("Licencias Transcurridas", transcurridas_total)
 
-        st.markdown("---")
     vista_general, nueva_licencia, modificar_licencia = st.tabs(["📊 Vista General", "➕ Nueva Licencia", "✏️ Modificar / Eliminar"])
 
     with vista_general:

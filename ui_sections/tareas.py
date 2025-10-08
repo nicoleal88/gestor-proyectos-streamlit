@@ -65,7 +65,6 @@ def add_comment_to_task(client, task_id, comment_text, comment_date):
 
 # --- SECCION DE TAREAS ---
 def seccion_tareas(client, personal_list):
-    st.subheader("📋 Gestión de Tareas")
     sheet_name = "Tareas"
     df_tasks = st.session_state.df_tareas
     sheet = get_sheet(client, sheet_name)
@@ -81,7 +80,6 @@ def seccion_tareas(client, personal_list):
         except KeyError:
             st.error("La columna 'Estado' no se encontró. No se pueden mostrar las métricas.")
 
-    st.markdown("---")
     vista_general, nueva_tarea, detalles = st.tabs(["📊 Vista General", "➕ Nueva Tarea", "🔍 Detalles y Comentarios"])
 
     with vista_general:

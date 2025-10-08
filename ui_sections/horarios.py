@@ -19,13 +19,6 @@ except Exception:
 
 warnings.filterwarnings("ignore", message=".*FontBBox.*")
 
-# --- Configuración de la Página ---
-st.set_page_config(
-    page_title="Análisis de Asistencia",
-    page_icon="🕒",
-    layout="wide"
-)
-
 # --- Funciones de Procesamiento ---
 
 def cargar_y_procesar_datos(archivo_subido):
@@ -544,7 +537,6 @@ def seccion_horarios(client, personal_list):
     """
 
     # --- Interfaz de Usuario (UI) ---
-    st.subheader("📊 Analizador de Horarios del Personal")
     
     # Toggle para modo incógnito
     incognito_mode = st.checkbox("Modo incógnito (mostrar IDs en lugar de nombres)", 

@@ -10,7 +10,6 @@ from datetime import datetime
 from google_sheets_client import get_sheet, refresh_data
 
 def seccion_notas(client, personal_list):
-    st.subheader("📝 Registro de Notas y Solicitudes")
     sheet_name = "Notas"
     df_notas = st.session_state.df_notas
     sheet = get_sheet(client, sheet_name)
@@ -26,7 +25,6 @@ def seccion_notas(client, personal_list):
         except KeyError:
             st.error("La columna 'Estado' no se encontró. No se pueden mostrar las métricas.")
 
-    st.markdown("---")
     vista_general, nueva_nota, modificar_nota = st.tabs(["📊 Vista General", "➕ Nueva Nota", "✏️ Modificar / Eliminar"])
 
     with vista_general:

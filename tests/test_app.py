@@ -90,9 +90,9 @@ class TestNavigation:
 
         # Create test page files
         test_files = [
-            '00_🏠_Inicio.py',
-            '01_✅_Tareas.py',
-            '02_📅_Vacaciones.py'
+            '00_Inicio.py',
+            '01_Tareas.py',
+            '02_Vacaciones.py'
         ]
 
         for filename in test_files:

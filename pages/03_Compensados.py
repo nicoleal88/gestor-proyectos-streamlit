@@ -3,6 +3,9 @@ from google_sheets_client import connect_to_google_sheets
 from ui_sections.compensados import seccion_compensados
 
 def page():
+    st.set_page_config(page_title="Compensados", page_icon="⚖️")
+    st.title("⚖️ Compensados")
+
     client = connect_to_google_sheets()
     if client:
         personal_list = []

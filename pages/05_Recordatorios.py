@@ -3,6 +3,9 @@ from google_sheets_client import connect_to_google_sheets
 from ui_sections.recordatorios import seccion_recordatorios
 
 def page():
+    st.set_page_config(page_title="Recordatorios", page_icon="🔔")
+    st.title("🔔 Recordatorios")
+
     client = connect_to_google_sheets()
     if client:
         personal_list = []

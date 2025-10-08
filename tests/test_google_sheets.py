@@ -87,16 +87,26 @@ class TestGoogleSheetsClient:
         mock_cache_resource.return_value = mock_client
 
         # Mock session state
-        with patch('google_sheets_client.st.session_state') as mock_session_state:
-            mock_session_state.df_personal = pd.DataFrame()
-            mock_session_state.df_tareas = pd.DataFrame()
+        with patch('google_sheets_client.st.session_state', new_callable=MagicMock) as mock_session_state, \
+             patch('google_sheets_client.get_sheet_data') as mock_get_sheet_data:
+
+            # Configure the mock to behave like a dictionary
+            def set_item(key, value):
+                setattr(mock_session_state, key, value)
+
+            mock_session_state.__setitem__.side_effect = set_item
+            mock_get_sheet_data.return_value = pd.DataFrame([{'col': 'value'}])
 
             # Test the function
-            refresh_data(mock_client)
+            refresh_data(mock_client, "Tareas")
+
+            # Verify that get_sheet_data was called
+            mock_get_sheet_data.assert_called_with(mock_client, "Tareas")
 
             # Verify that session state was updated
-            assert hasattr(mock_session_state, 'df_personal')
             assert hasattr(mock_session_state, 'df_tareas')
+            assert not mock_session_state.df_tareas.empty
+
 
     @patch('google_sheets_client.gspread.service_account')
     @patch('google_sheets_client.st.cache_resource')
@@ -111,15 +121,12 @@ class TestGoogleSheetsClient:
 
         # Mock session state
         with patch('google_sheets_client.st.session_state') as mock_session_state:
-            mock_session_state.df_personal = pd.DataFrame()
-            mock_session_state.df_tareas = pd.DataFrame()
-
             # Test the function - should handle exception gracefully
-            refresh_data(mock_client)
+            refresh_data(mock_client, "Tareas")
 
-            # Should not crash and session state should remain intact
-            assert hasattr(mock_session_state, 'df_personal')
+            # Should not crash and session state should be an empty DataFrame
             assert hasattr(mock_session_state, 'df_tareas')
+            assert mock_session_state.df_tareas.empty
 
 
 class TestDataValidation:

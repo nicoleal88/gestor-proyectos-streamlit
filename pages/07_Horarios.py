@@ -3,6 +3,9 @@ from google_sheets_client import connect_to_google_sheets
 from ui_sections.horarios import seccion_horarios
 
 def page():
+    st.set_page_config(page_title="Horarios", page_icon="⏰")
+    st.title("⏰ Horarios")
+
     client = connect_to_google_sheets()
     if client:
         personal_list = []

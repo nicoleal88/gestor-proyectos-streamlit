@@ -10,7 +10,6 @@ from datetime import datetime
 from google_sheets_client import get_sheet, refresh_data
 
 def seccion_compensados(client, personal_list):
-    st.subheader("⏱️ Registro de Compensatorios")
     sheet_name = "Compensados"
     df_compensados = st.session_state.df_compensados
     sheet = get_sheet(client, sheet_name)
@@ -31,8 +30,6 @@ def seccion_compensados(client, personal_list):
         col2.metric("Compensatorios en Curso", en_curso_total)
         col3.metric("Próximos Compensatorios", proximos_total)
         col4.metric("Compensatorios Transcurridos", transcurridos_total)
-
-        st.markdown("---")
 
     vista_general, agregar_compensatorio, modificar_eliminar = st.tabs(["📊 Vista General", "➕ Agregar Compensatorio", "✏️ Modificar / Eliminar"])
 
