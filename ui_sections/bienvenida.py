@@ -150,8 +150,8 @@ def get_exchange_rates(base_currency='USD', target_currencies=['ARS', 'EUR', 'BR
         st.error(f"Error al obtener tasas de cambio: {e}")
     return None
 
-@st.cache_data(ttl=3600)  # Cache por 1 hora
-def obtener_tipo_cambio() -> Optional[Dict[str, Dict[str, float]]]:
+@st.cache_data(ttl=600)  # Cache por 10 minutos
+def obtener_tipo_cambio(day_key: str) -> Optional[Dict[str, Dict[str, float]]]:
     """Obtiene los tipos de cambio de ArgentinaDatos API y DolarAPI (para el euro)"""
     try:
         # Obtener datos actuales (últimos 7 días)
@@ -291,6 +291,13 @@ def obtener_tipo_cambio() -> Optional[Dict[str, Dict[str, float]]]:
                 
             return ((valor_actual - valor_anterior) / valor_anterior) * 100
         
+        # Helper para normalizar fechas a ISO (YYYY-MM-DD)
+        def _norm_fecha(fecha_val):
+            try:
+                return pd.to_datetime(str(fecha_val)).date().isoformat()
+            except Exception:
+                return None
+
         return {
             'oficial': {
                 'compra': oficial.get('compra', 0) if oficial else 0,
@@ -298,7 +305,7 @@ def obtener_tipo_cambio() -> Optional[Dict[str, Dict[str, float]]]:
                 'variacion': calcular_variacion(hist_oficial) if hist_oficial else 0,
                 'historico_compra': [d.get('compra', 0) for d in hist_oficial if 'compra' in d],
                 'historico_venta': [d.get('venta', 0) for d in hist_oficial if 'venta' in d],
-                'fechas': [d.get('fecha', '').split('T')[0] for d in hist_oficial if 'fecha' in d],
+                'fechas': [f for f in (_norm_fecha(d.get('fecha')) for d in hist_oficial) if f],
                 'timestamp': datetime.now().timestamp()
             },
             'blue': {
@@ -307,7 +314,7 @@ def obtener_tipo_cambio() -> Optional[Dict[str, Dict[str, float]]]:
                 'variacion': calcular_variacion(hist_blue) if hist_blue else 0,
                 'historico_compra': [d.get('compra', 0) for d in hist_blue if 'compra' in d],
                 'historico_venta': [d.get('venta', 0) for d in hist_blue if 'venta' in d],
-                'fechas': [d.get('fecha', '').split('T')[0] for d in hist_blue if 'fecha' in d],
+                'fechas': [f for f in (_norm_fecha(d.get('fecha')) for d in hist_blue) if f],
                 'timestamp': datetime.now().timestamp()
             },
             'euro': {
@@ -343,7 +350,8 @@ def mostrar_seccion_bienvenida():
     # Obtener el clima actual
     weather = get_weather()
     pronostico = obtener_pronostico_extendido()
-    tipos_cambio = obtener_tipo_cambio()
+    # Pasar clave diaria para invalidar cache cada día
+    tipos_cambio = obtener_tipo_cambio(day_key=datetime.now().strftime('%Y-%m-%d'))
     
     # Mostrar información del clima en 3 columnas
     col1, col2, col3 = st.columns([3, 4, 4])
@@ -505,8 +513,8 @@ def mostrar_seccion_bienvenida():
         # Gráfico de tendencia más grande en la tercera columna
         with col3:
             st.markdown("#### Tendencias (últimos 7 días)")
-            # Verificar que tengamos datos históricos de compra para al menos un tipo de cambio
-            if any(len(tipos_cambio[key].get('historico_compra', [])) > 1 for key in ['oficial', 'blue']):
+            # Renderizar si hay al menos 1 dato histórico (hoy se agrega si falta)
+            if any(len(tipos_cambio[key].get('historico_compra', [])) >= 1 for key in ['oficial', 'blue']):
                 fig_tendencia = go.Figure()
                 
                 # Agregar líneas para cada tipo de cambio
@@ -514,14 +522,36 @@ def mostrar_seccion_bienvenida():
                     ('oficial', '#ff7f0e', 'Dólar Oficial'),  # Naranja para el oficial
                     ('blue', '#1f77b4', 'Dólar Blue')         # Azul para el blue
                 ]:
+                    # Preparar series locales y garantizar que incluimos el día actual si falta
+                    historico_compra = list(tipos_cambio[key].get('historico_compra', []))
+                    historico_venta = list(tipos_cambio[key].get('historico_venta', []))
+                    fechas_series = list(tipos_cambio[key].get('fechas', []))
+
+                    # Fecha de hoy en formato ISO para comparaciones consistentes
+                    hoy_str = datetime.now().date().isoformat()
+
+                    # Si falta el día actual y tenemos valores actuales, agregarlos al final
+                    valor_actual_compra = tipos_cambio[key].get('compra')
+                    valor_actual_venta = tipos_cambio[key].get('venta')
+                    if hoy_str not in {str(f).split('T')[0] for f in fechas_series} and \
+                       valor_actual_compra is not None and valor_actual_venta is not None and \
+                       valor_actual_compra != 0 and valor_actual_venta != 0:
+                        fechas_series.append(hoy_str)
+                        historico_compra.append(valor_actual_compra)
+                        historico_venta.append(valor_actual_venta)
+
+                    # Convertir fechas a datetime para que el eje X formatee ticks como fechas
+                    try:
+                        fechas_dt = pd.to_datetime([f.split('T')[0] for f in fechas_series], errors='coerce')
+                    except Exception:
+                        fechas_dt = fechas_series  # fallback a strings si algo falla
+
                     # Verificar que tengamos datos históricos de compra y venta
-                    if (len(tipos_cambio[key].get('historico_compra', [])) > 1 and 
-                        len(tipos_cambio[key].get('historico_venta', [])) > 1 and
-                        len(tipos_cambio[key].get('fechas', [])) > 1):
+                    if (len(historico_compra) > 1 and len(historico_venta) > 1 and len(fechas_series) > 1):
                         # Línea de compra
                         fig_tendencia.add_trace(go.Scatter(
-                            x=tipos_cambio[key]['fechas'],
-                            y=tipos_cambio[key]['historico_compra'],
+                            x=fechas_dt,
+                            y=historico_compra,
                             name=f'{name} - Compra',
                             line=dict(
         color=color, 
@@ -541,8 +571,8 @@ def mostrar_seccion_bienvenida():
                         
                         # Línea de venta
                         fig_tendencia.add_trace(go.Scatter(
-                            x=tipos_cambio[key]['fechas'],
-                            y=tipos_cambio[key]['historico_venta'],
+                            x=fechas_dt,
+                            y=historico_venta,
                             name=f'{name} - Venta',
                             line=dict(
         color=color, 
@@ -558,13 +588,29 @@ def mostrar_seccion_bienvenida():
         opacity=0.9
     )
                         ))
+
+                        # Nota: evitamos agregar trazas adicionales para el día de hoy
+                        # para no duplicar puntos (el punto de hoy ya está incluido en la serie)
                 
                 # Obtener el rango de valores para el eje Y con un margen del 5%
                 all_values = []
                 for key in ['oficial', 'blue']:
-                    if len(tipos_cambio[key].get('historico_compra', [])) > 0:
-                        all_values.extend(tipos_cambio[key]['historico_compra'])
-                        all_values.extend(tipos_cambio[key]['historico_venta'])
+                    compras = list(tipos_cambio[key].get('historico_compra', []))
+                    ventas = list(tipos_cambio[key].get('historico_venta', []))
+                    fechas_series = list(tipos_cambio[key].get('fechas', []))
+                    hoy_str = datetime.now().date().isoformat()
+                    if hoy_str not in {str(f).split('T')[0] for f in fechas_series}:
+                        # incluir los valores actuales en el cálculo del rango
+                        comp = tipos_cambio[key].get('compra')
+                        ven = tipos_cambio[key].get('venta')
+                        if comp:
+                            compras.append(comp)
+                        if ven:
+                            ventas.append(ven)
+                    if len(compras) > 0:
+                        all_values.extend(compras)
+                    if len(ventas) > 0:
+                        all_values.extend(ventas)
                 
                 if all_values:
                     min_val = min(all_values)
@@ -591,6 +637,7 @@ def mostrar_seccion_bienvenida():
                         gridcolor='rgba(200, 200, 200, 0.15)' ,
                         tickangle=-45,
                         tickformat='%a %d/%m',  # Formato: Mar 08/10
+                        type='date',
                         title='',
                         title_font=dict(size=12),
                         showline=True,
