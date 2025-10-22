@@ -104,32 +104,101 @@ def seccion_compensados(client, personal_list):
     with agregar_compensatorio:
         tipo_compensatorio = st.radio("Tipo de compensatorio", ("Día completo", "Por horas"), key="tipo_compensatorio_radio")
 
+        # Entradas en vivo (fuera del form) para poder mostrar leyendas dinámicas
+        if st.session_state.tipo_compensatorio_radio == "Día completo":
+            col1, col2 = st.columns(2)
+            desde_fecha_live = col1.date_input("Desde fecha", key="comp_desde_fecha", value=datetime.now().date())
+            hasta_fecha_live = col2.date_input("Hasta fecha", key="comp_hasta_fecha", value=datetime.now().date())
+
+            # Cálculo en vivo de días (inclusive)
+            if hasta_fecha_live < desde_fecha_live:
+                st.warning("La fecha 'Hasta' es anterior a 'Desde'.")
+                dias = 0
+            else:
+                dias = (hasta_fecha_live - desde_fecha_live).days + 1
+                st.info(f"Días comprendidos: {dias}")
+
+            # Valores por horas no aplican aquí
+            st.session_state.setdefault("comp_desde_hora", None)
+            st.session_state.setdefault("comp_hasta_hora", None)
+        else:  # Por horas
+            col1, col2, col3 = st.columns(3)
+            fecha_live = col1.date_input("Fecha", key="comp_fecha", value=datetime.now().date())
+            desde_hora_live = col2.time_input("Desde hora", key="comp_desde_hora")
+            hasta_hora_live = col3.time_input("Hasta hora", key="comp_hasta_hora")
+
+            # Cálculo en vivo de horas
+            try:
+                from datetime import datetime as _dt, date as _date, time as _time
+                start_dt = _dt.combine(fecha_live, desde_hora_live)
+                end_dt = _dt.combine(fecha_live, hasta_hora_live)
+                if end_dt <= start_dt:
+                    st.warning("La 'Hasta hora' debe ser posterior a 'Desde hora'.")
+                else:
+                    delta = end_dt - start_dt
+                    total_minutes = int(delta.total_seconds() // 60)
+                    hours = total_minutes // 60
+                    minutes = total_minutes % 60
+                    st.info(f"Horas comprendidas: {hours} h {minutes} min")
+            except Exception:
+                pass
+            # Normalizamos para el envío
+            st.session_state["comp_desde_fecha"] = fecha_live
+            st.session_state["comp_hasta_fecha"] = fecha_live
+
         with st.form("compensados_form", clear_on_submit=True):
             nombre = st.selectbox("Apellido, Nombres", options=["Seleccione persona..."] + personal_list)
             fecha_solicitud = st.date_input("Fecha Solicitud", value=datetime.now())
-            tipo = st.selectbox("Tipo", options=["Compensatorio"])
-            
-            if st.session_state.tipo_compensatorio_radio == "Día completo":
-                col1, col2 = st.columns(2)
-                desde_fecha = col1.date_input("Desde fecha")
-                hasta_fecha = col2.date_input("Hasta fecha")
-                desde_hora = None
-                hasta_hora = None
-            else: # Por horas
-                col1, col2, col3 = st.columns(3)
-                fecha = col1.date_input("Fecha")
-                desde_hora = col2.time_input("Desde hora")
-                hasta_hora = col3.time_input("Hasta hora")
-                desde_fecha = fecha
-                hasta_fecha = fecha
+            tipo = st.selectbox("Tipo", options=["Compensatorio", "Certificado médico"])
+
+            # Tomamos los valores seteados fuera del form
+            desde_fecha = st.session_state.get("comp_desde_fecha")
+            hasta_fecha = st.session_state.get("comp_hasta_fecha")
+            desde_hora = st.session_state.get("comp_desde_hora")
+            hasta_hora = st.session_state.get("comp_hasta_hora")
 
             if st.form_submit_button("Agregar Registro"):
                 if nombre == "Seleccione persona...":
                     st.warning("Por favor, seleccione una persona.")
+                elif desde_fecha is None or hasta_fecha is None:
+                    st.warning("Por favor, seleccione las fechas.")
+                elif st.session_state.tipo_compensatorio_radio != "Día completo":
+                    # Validación para por horas: hasta > desde
+                    from datetime import datetime as _dt
+                    start_dt = _dt.combine(desde_fecha, desde_hora) if (desde_fecha and desde_hora) else None
+                    end_dt = _dt.combine(hasta_fecha, hasta_hora) if (hasta_fecha and hasta_hora) else None
+                    if not start_dt or not end_dt:
+                        st.warning("Por favor, complete las horas de inicio y fin.")
+                    elif end_dt <= start_dt:
+                        st.warning("La 'Hasta hora' debe ser posterior a 'Desde hora'.")
+                    else:
+                        desde_hora_str = desde_hora.strftime('%H:%M') if desde_hora else ''
+                        hasta_hora_str = hasta_hora.strftime('%H:%M') if hasta_hora else ''
+                        new_row = [
+                            nombre,
+                            fecha_solicitud.strftime('%Y-%m-%d'),
+                            tipo,
+                            desde_fecha.strftime('%Y-%m-%d'),
+                            desde_hora_str,
+                            hasta_fecha.strftime('%Y-%m-%d'),
+                            hasta_hora_str,
+                        ]
+                        sheet.append_row(new_row)
+                        refresh_data(client, sheet_name)
+                        st.success("Registro de compensatorio agregado.")
+                        st.rerun()
                 else:
                     desde_hora_str = desde_hora.strftime('%H:%M') if desde_hora else ''
                     hasta_hora_str = hasta_hora.strftime('%H:%M') if hasta_hora else ''
-                    new_row = [nombre, fecha_solicitud.strftime('%Y-%m-%d'), tipo, desde_fecha.strftime('%Y-%m-%d'), desde_hora_str, hasta_fecha.strftime('%Y-%m-%d'), hasta_hora_str]
+                    new_row = [
+                        nombre,
+                        fecha_solicitud.strftime('%Y-%m-%d'),
+                        tipo,
+                        desde_fecha.strftime('%Y-%m-%d'),
+                        desde_hora_str,
+                        hasta_fecha.strftime('%Y-%m-%d'),
+                        hasta_hora_str,
+                    ]
                     sheet.append_row(new_row)
                     refresh_data(client, sheet_name)
                     st.success("Registro de compensatorio agregado.")
