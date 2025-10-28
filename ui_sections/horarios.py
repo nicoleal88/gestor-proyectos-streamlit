@@ -376,8 +376,10 @@ def leer_excel_horarios(archivo_excel):
 def obtener_compensatorios_por_fecha():
     """
     Obtiene los compensatorios activos del session_state y los procesa para el análisis de horarios.
-    Solo incluye compensatorios con horas de inicio y fin definidas.
-    Devuelve un DataFrame con los compensatorios por fecha y empleado.
+    Incluye:
+    - Ausencias "por horas" (usa horas de inicio y fin)
+    - Ausencias de "día completo" (expande cada día con 8 horas)
+    Devuelve un DataFrame con los registros por fecha y empleado.
     """
     if 'df_compensados' not in st.session_state or st.session_state.df_compensados.empty:
         return pd.DataFrame()
@@ -396,53 +398,131 @@ def obtener_compensatorios_por_fecha():
         compensados['Desde fecha'] = pd.to_datetime(compensados['Desde fecha']).dt.date
         compensados['Hasta fecha'] = pd.to_datetime(compensados['Hasta fecha']).dt.date
         
-        # Filtrar solo compensatorios con horas de inicio y fin definidas
-        compensados = compensados[
+        # Subconjuntos: por horas vs día completo
+        mask_con_horas = (
             compensados['Desde hora'].notna() &
             compensados['Hasta hora'].notna() &
             (compensados['Desde hora'] != '') &
             (compensados['Hasta hora'] != '')
-        ]
-        
-        if compensados.empty:
-            return pd.DataFrame()
-            
-        # Procesar cada registro de compensatorio
+        )
+        df_con_horas = compensados[mask_con_horas].copy()
+        df_dia_completo = compensados[~mask_con_horas].copy()
+
         registros = []
-        for _, row in compensados.iterrows():
+
+        # Procesar ausencias por horas
+        for _, row in df_con_horas.iterrows():
             try:
-                # Obtener la duración en horas
                 hora_inicio = pd.to_datetime(row['Desde hora']).time()
                 hora_fin = pd.to_datetime(row['Hasta hora']).time()
-                
-                # Calcular duración en horas
+
                 inicio_dt = datetime.combine(datetime.today(), hora_inicio)
                 fin_dt = datetime.combine(datetime.today(), hora_fin)
-                duracion = (fin_dt - inicio_dt).total_seconds() / 3600  # Convertir a horas
-                
-                # Obtener ID del empleado desde el nombre (asumiendo que está en el formato 'Apellido, Nombre')
+                duracion = (fin_dt - inicio_dt).total_seconds() / 3600
+
                 nombre_empleado = row['Apellido, Nombres']
                 id_empleado = next((k for k, v in ID_NOMBRE_MAP.items() if v == nombre_empleado), None)
-                
+
                 if id_empleado:
                     registros.append({
                         'fecha': row['Desde fecha'],
                         'fecha_dt': pd.Timestamp(row['Desde fecha']),
                         'id_empleado': id_empleado,
-                    'tipo': 'COMPENSATORIO',
-                    'duracion_horas': duracion,
-                    'fecha_formateada': row['Desde fecha'].strftime('%a %d-%b-%Y'),
-                    'hora_inicio': hora_inicio.strftime('%H:%M'),
-                    'hora_fin': hora_fin.strftime('%H:%M')
-                })
+                        'tipo': 'AUSENCIAS',
+                        'duracion_horas': duracion,
+                        'fecha_formateada': pd.Timestamp(row['Desde fecha']).strftime('%a %d-%b-%Y'),
+                        'hora_inicio': hora_inicio.strftime('%H:%M'),
+                        'hora_fin': hora_fin.strftime('%H:%M')
+                    })
             except Exception as e:
-                st.warning(f"Error al procesar compensatorio para {row.get('Apellido, Nombres', 'empleado')}: {str(e)}")
+                st.warning(f"Error al procesar ausencia por horas para {row.get('Apellido, Nombres', 'empleado')}: {str(e)}")
                 continue
-                
+
+        # Procesar ausencias de día completo: expandir cada día con 8 horas
+        for _, row in df_dia_completo.iterrows():
+            try:
+                nombre_empleado = row['Apellido, Nombres']
+                id_empleado = next((k for k, v in ID_NOMBRE_MAP.items() if v == nombre_empleado), None)
+                if not id_empleado:
+                    continue
+
+                inicio = pd.Timestamp(row['Desde fecha'])
+                fin = pd.Timestamp(row['Hasta fecha'])
+                if pd.isna(inicio) or pd.isna(fin) or fin < inicio:
+                    continue
+
+                fechas = pd.date_range(start=inicio, end=fin, freq='D')
+                for f in fechas:
+                    registros.append({
+                        'fecha': f.date(),
+                        'fecha_dt': f,
+                        'id_empleado': id_empleado,
+                        'tipo': 'AUSENCIAS',
+                        'duracion_horas': 8.0,
+                        'fecha_formateada': f.strftime('%a %d-%b-%Y'),
+                        'hora_inicio': '',
+                        'hora_fin': ''
+                    })
+            except Exception as e:
+                st.warning(f"Error al procesar ausencia de día completo para {row.get('Apellido, Nombres', 'empleado')}: {str(e)}")
+                continue
+
         return pd.DataFrame(registros)
         
     except Exception as e:
         st.error(f"Error al procesar compensatorios: {str(e)}")
+        return pd.DataFrame()
+
+def obtener_vacaciones_por_fecha():
+    """
+    Convierte las licencias/vacaciones del session_state en registros diarios de 8h por empleado.
+    Devuelve columnas compatibles con el pipeline de Horarios.
+    """
+    df_vac = st.session_state.get('df_vacaciones', pd.DataFrame())
+    if df_vac is None or df_vac.empty:
+        return pd.DataFrame()
+
+    # Columnas esperadas: 'Apellido, Nombres', 'Fecha inicio', 'Fecha regreso'
+    required = ['Apellido, Nombres', 'Fecha inicio', 'Fecha regreso']
+    if not all(col in df_vac.columns for col in required):
+        return pd.DataFrame()
+
+    try:
+        vac = df_vac.copy()
+        vac['Fecha inicio'] = pd.to_datetime(vac['Fecha inicio'], errors='coerce').dt.date
+        vac['Fecha regreso'] = pd.to_datetime(vac['Fecha regreso'], errors='coerce').dt.date
+
+        registros = []
+        for _, row in vac.iterrows():
+            try:
+                inicio = pd.Timestamp(row['Fecha inicio'])
+                fin = pd.Timestamp(row['Fecha regreso'])
+                # No incluir el día de regreso: fin es no-inclusivo
+                if pd.isna(inicio) or pd.isna(fin) or fin <= inicio:
+                    continue
+
+                nombre = row['Apellido, Nombres']
+                id_emp = next((k for k, v in ID_NOMBRE_MAP.items() if v == nombre), None)
+                # Fallback: si no hay ID mapeado, usar el nombre como identificador para no perder la barra
+                if not id_emp:
+                    id_emp = nombre
+
+                # Expandir diariamente SIN incluir el día de regreso (fin no inclusivo)
+                for f in pd.date_range(start=inicio, end=fin - pd.Timedelta(days=1), freq='D'):
+                    registros.append({
+                        'fecha': f.date(),
+                        'fecha_dt': f,
+                        'id_empleado': id_emp,
+                        'tipo': 'VACACIONES',
+                        'duracion_horas': 8.0,
+                        'fecha_formateada': f.strftime('%a %d-%b-%Y'),
+                        'hora_inicio': '',
+                        'hora_fin': ''
+                    })
+            except Exception:
+                continue
+        return pd.DataFrame(registros)
+    except Exception:
         return pd.DataFrame()
 
 # --- Relación ID <-> Apellido y Nombre ---
@@ -1039,12 +1119,17 @@ def seccion_horarios(client, personal_list):
                     lambda x: f"{dias_semana[x.weekday()]} {x.strftime('%d-%b-%Y')}"
                 )
                 
-                # Obtener datos de compensatorios para el empleado y filtrar por mes seleccionado
+                # Obtener datos de ausencias y vacaciones y filtrar por mes/empleado
                 df_compensatorios = obtener_compensatorios_por_fecha()
+                df_vacaciones_plot = obtener_vacaciones_por_fecha()
                 if not df_compensatorios.empty:
-                    # Filtrar por empleado si está seleccionado
+                    # Filtrar por empleado si está seleccionado (tolerante a ID o Nombre)
                     if empleado_seleccionado != 'Todos':
-                        df_compensatorios = df_compensatorios[df_compensatorios['id_empleado'] == empleado_seleccionado]
+                        allowed_ids = {empleado_seleccionado}
+                        nombre_emp = ID_NOMBRE_MAP.get(empleado_seleccionado)
+                        if nombre_emp:
+                            allowed_ids.add(nombre_emp)
+                        df_compensatorios = df_compensatorios[df_compensatorios['id_empleado'].isin(allowed_ids)]
                     
                     # Filtrar por mes seleccionado
                     if mes_seleccionado != 'Todos':
@@ -1055,6 +1140,21 @@ def seccion_horarios(client, personal_list):
                             (df_compensatorios['fecha_dt'].dt.month == mes_seleccionado_dt.month) &
                             (df_compensatorios['fecha_dt'].dt.year == mes_seleccionado_dt.year)
                         ]
+                if df_vacaciones_plot is not None and not df_vacaciones_plot.empty:
+                    if empleado_seleccionado != 'Todos':
+                        allowed_ids_v = {empleado_seleccionado}
+                        nombre_emp_v = ID_NOMBRE_MAP.get(empleado_seleccionado)
+                        if nombre_emp_v:
+                            allowed_ids_v.add(nombre_emp_v)
+                        df_vacaciones_plot = df_vacaciones_plot[df_vacaciones_plot['id_empleado'].isin(allowed_ids_v)]
+                    if mes_seleccionado != 'Todos':
+                        mes_seleccionado_dt = pd.to_datetime(mes_seleccionado)
+                        df_vacaciones_plot = df_vacaciones_plot[
+                            (df_vacaciones_plot['fecha_dt'].dt.month == mes_seleccionado_dt.month) &
+                            (df_vacaciones_plot['fecha_dt'].dt.year == mes_seleccionado_dt.year)
+                        ]
+                    if df_vacaciones_plot.empty:
+                        st.info("No hay vacaciones para mostrar según los filtros seleccionados.")
                 
                 # Asegurarse de que tenemos la columna 'tipo' correcta (puede ser 'tipo_x' o 'tipo_y')
                 tipo_col = 'tipo_x' if 'tipo_x' in df_plot.columns else 'tipo_y' if 'tipo_y' in df_plot.columns else 'tipo'
@@ -1066,10 +1166,13 @@ def seccion_horarios(client, personal_list):
                 from itertools import product
                 fechas_unicas = df_plot['fecha'].unique()
                 
-                # Si hay compensatorios, añadir sus fechas únicas
+                # Si hay ausencias/vacaciones, añadir sus fechas únicas
                 if not df_compensatorios.empty:
                     fechas_compensatorios = df_compensatorios['fecha'].unique()
                     fechas_unicas = pd.unique(list(fechas_unicas) + list(fechas_compensatorios))
+                if df_vacaciones_plot is not None and not df_vacaciones_plot.empty:
+                    fechas_vac = df_vacaciones_plot['fecha'].unique()
+                    fechas_unicas = pd.unique(list(fechas_unicas) + list(fechas_vac))
                 
                 # Definir los tipos de registro
                 tipos = ['LIBRO', 'RELOJ']
@@ -1106,6 +1209,19 @@ def seccion_horarios(client, personal_list):
                         df_completo,
                         df_compensatorios_plot[df_completo.columns.intersection(df_compensatorios_plot.columns)]
                     ], ignore_index=True)
+                if df_vacaciones_plot is not None and not df_vacaciones_plot.empty:
+                    df_vacaciones_plot = df_vacaciones_plot.rename(columns={
+                        'tipo': 'tipo_combinado',
+                        'fecha_dt': 'fecha_dt',
+                        'fecha_formateada': 'fecha_formateada'
+                    })
+                    for col in ['inicio_jornada', 'fin_jornada', 'minutos_trabajados', 'hora_entrada', 'hora_salida']:
+                        if col not in df_vacaciones_plot.columns:
+                            df_vacaciones_plot[col] = None
+                    df_completo = pd.concat([
+                        df_completo,
+                        df_vacaciones_plot[df_completo.columns.intersection(df_vacaciones_plot.columns)]
+                    ], ignore_index=True)
                 
                 # Ordenar por fecha y tipo
                 df_completo = df_completo.sort_values(['fecha', 'tipo_combinado'])
@@ -1140,45 +1256,46 @@ def seccion_horarios(client, personal_list):
                 
                 # Crear una copia del DataFrame para no modificar el original
                 df_plot = df_completo.copy()
-                
-                # Calcular el espaciado de ticks basado en el número de fechas
-                fechas_unicas = sorted(df_plot['fecha'].unique())
+
+                # -------- Gráfico integrado: LIBRO / RELOJ / AUSENCIAS / VACACIONES --------
+                fechas_unicas = sorted(df_plot['fecha'].unique()) if not df_plot.empty else []
                 n_fechas = len(fechas_unicas)
-                
-                # Mostrar una etiqueta cada cierta cantidad de días dependiendo de cuántas fechas hay
-                if n_fechas > 30:  # Si hay muchas fechas, mostrar una cada 7 días
-                    step = max(1, n_fechas // 15)  # Asegurar al menos 1 y aproximadamente 15 etiquetas
+
+                if n_fechas > 30:
+                    step = max(1, n_fechas // 15)
                     tick_vals = fechas_unicas[::step]
                     tick_text = [f"{pd.to_datetime(d).strftime('%d/%m')}" for d in tick_vals]
                 else:
                     tick_vals = fechas_unicas
                     tick_text = [f"{pd.to_datetime(d).strftime('%d/%m')}" for d in tick_vals]
-                
-                # Crear el gráfico de barras agrupado
+
                 fig_historial = px.bar(
                     df_plot,
                     x='fecha',
                     y='duracion_horas',
                     color='tipo_combinado',
-                    barmode='group',  # Esto coloca las barras una al lado de la otra
-                    title='Comparación de horas trabajadas por día',
-                    labels={
-                        'fecha': 'Fecha', 
-                        'duracion_horas': 'Horas Trabajadas',
-                        'tipo_combinado': 'Tipo de Registro'
-                    },
+                    barmode='group',
+                    title='Horas trabajadas, ausencias y vacaciones por día',
+                    labels={'fecha': 'Fecha', 'duracion_horas': 'Horas', 'tipo_combinado': 'Tipo'},
                     color_discrete_map={
-                        'LIBRO': '#1f77b4',  # Azul para LIBRO
-                        'RELOJ': '#ff7f0e',  # Naranja para RELOJ
-                        'COMPENSATORIO': '#9b59b6'  # Violeta para COMPENSATORIO
+                        'LIBRO': '#1f77b4',
+                        'RELOJ': '#ff7f0e',
+                        'AUSENCIAS': '#9b59b6',
+                        'VACACIONES': '#16a085'
                     },
-                    category_orders={
-                        'fecha': fechas_unicas,
-                        'tipo_combinado': ["LIBRO", "RELOJ", "COMPENSATORIO"]
-                    },
+                    category_orders={'fecha': fechas_unicas, 'tipo_combinado': ["LIBRO", "RELOJ", "AUSENCIAS", "VACACIONES"]},
                     template='plotly_white',
                     custom_data=['fecha_formateada', 'tipo_combinado', 'es_salida_campo']
                 )
+
+                # Aplicar un leve offset y ajuste de ancho a la serie de VACACIONES
+                for tr in fig_historial.data:
+                    if getattr(tr, 'name', '') == 'VACACIONES':
+                        try:
+                            tr.offset = -0.3
+                            tr.width = 0.35
+                        except Exception:
+                            pass
                 
                 # Configurar el diseño del gráfico
                 fig_historial.update_layout(
@@ -1227,8 +1344,7 @@ def seccion_horarios(client, personal_list):
                     if hasattr(trace, 'customdata') and trace.customdata is not None:
                         for i, custom_data in enumerate(trace.customdata):
                             if i < len(line_widths) and len(custom_data) > 2 and custom_data[2]:  # es_salida_campo es True
-                                line_widths[i] = 2
-                                line_colors[i] = 'red'
+                                pass
                     
                     # Aplicar los bordes
                     trace.marker.line.width = line_widths
@@ -1239,7 +1355,7 @@ def seccion_horarios(client, personal_list):
                     xaxis={
                         'type': 'category',
                         'categoryorder': 'array',
-                        'categoryarray': sorted(df_plot['fecha'].unique())
+                        'categoryarray': sorted(df_plot['fecha'].unique()) if not df_plot.empty else []
                     },
                     # Mejorar el espaciado entre grupos de barras
                     bargap=0.15,
@@ -1288,56 +1404,6 @@ def seccion_horarios(client, personal_list):
                             if 'color' not in trace.marker.line:
                                 trace.marker.line['color'] = 'DarkSlateGrey'
                 
-                # Ajustar el diseño del gráfico
-                fig_historial.update_layout(
-                    xaxis_tickangle=-45,
-                    xaxis_title=None,
-                    legend_title='Tipo de Registro',
-                    legend=dict(
-                        orientation="h",
-                        yanchor="bottom",
-                        y=1.02,
-                        xanchor="right",
-                        x=1,
-                        title_font=dict(size=12),
-                        font=dict(size=11),
-                        bordercolor='rgba(0,0,0,0)',
-                        borderwidth=0,
-                        itemwidth=30,
-                        itemsizing='constant'
-                    ),
-                    margin=dict(l=20, r=20, t=40, b=20),
-                    plot_bgcolor='rgba(0,0,0,0)',
-                    paper_bgcolor='rgba(0,0,0,0)',
-                    xaxis=dict(
-                        showgrid=False,
-                        tickmode='array',
-                        tickvals=df_plot['fecha'].unique(),
-                        ticktext=[f"{d.strftime('%d/%m')}" for d in pd.to_datetime(df_plot['fecha'].unique())]
-                    ),
-                    yaxis=dict(
-                        showgrid=True,
-                        gridcolor='lightgray',
-                        gridwidth=0.5,
-                        title_text='Horas Trabajadas'
-                    ),
-                    height=400,
-                    # Añadir anotación explicativa sobre los días resaltados
-                    annotations=[
-                        dict(
-                            x=0.5,
-                            y=-0.18,
-                            showarrow=False,
-                            text="Días resaltados en rojo indican posible salida al campo (2 registros de reloj y más de 7 horas trabajadas)",
-                            xref="paper",
-                            yref="paper",
-                            font=dict(
-                                size=12,
-                                color="red"
-                            )
-                        )
-                    ]
-                )
                 
                 # Añadir línea horizontal en 8 horas
                 fig_historial.add_hline(
