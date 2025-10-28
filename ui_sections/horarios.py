@@ -1691,11 +1691,18 @@ def seccion_horarios(client, personal_list):
             
             # Mostrar todos los registros del empleado seleccionado
             if empleado_seleccionado != 'Todos':
-                # Filtrar registros del empleado seleccionado
-                registros_empleado = df_registros[df_registros['id_empleado'] == empleado_seleccionado].copy()
+                # Filtrar registros del empleado seleccionado (acepta ID o Nombre)
+                allowed_ids = {empleado_seleccionado}
+                nombre_emp_det = ID_NOMBRE_MAP.get(empleado_seleccionado)
+                if nombre_emp_det:
+                    allowed_ids.add(nombre_emp_det)
+                registros_empleado = df_registros[df_registros['id_empleado'].isin(allowed_ids)].copy()
                 
-                # Agregar columna de fecha para agrupar
+                # Agregar columnas de fecha y año_mes para agrupar/filtrar
                 registros_empleado['fecha'] = pd.to_datetime(registros_empleado['fecha_hora']).dt.date
+                registros_empleado['año_mes'] = pd.to_datetime(registros_empleado['fecha_hora']).dt.to_period('M').astype(str)
+                if mes_seleccionado != 'Todos':
+                    registros_empleado = registros_empleado[registros_empleado['año_mes'] == mes_seleccionado]
                 
                 # Ordenar por fecha y hora
                 registros_empleado = registros_empleado.sort_values('fecha_hora')
