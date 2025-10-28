@@ -10,7 +10,7 @@ from datetime import datetime
 from google_sheets_client import get_sheet, refresh_data
 
 def seccion_compensados(client, personal_list):
-    st.subheader("⏱️ Registro de Compensatorios")
+    st.subheader("⏱️ Registro de Ausencias")
     sheet_name = "Compensados"
     df_compensados = st.session_state.df_compensados
     sheet = get_sheet(client, sheet_name)
@@ -28,13 +28,13 @@ def seccion_compensados(client, personal_list):
 
         col1, col2, col3, col4 = st.columns(4)
         col1.metric("Total de Registros", len(df_compensados))
-        col2.metric("Compensatorios en Curso", en_curso_total)
-        col3.metric("Próximos Compensatorios", proximos_total)
-        col4.metric("Compensatorios Transcurridos", transcurridos_total)
+        col2.metric("Ausencias en Curso", en_curso_total)
+        col3.metric("Próximas Ausencias", proximos_total)
+        col4.metric("Ausencias Transcurridas", transcurridos_total)
 
         st.markdown("---")
 
-    vista_general, agregar_compensatorio, modificar_eliminar = st.tabs(["📊 Vista General", "➕ Agregar Compensatorio", "✏️ Modificar / Eliminar"])
+    vista_general, agregar_compensatorio, modificar_eliminar = st.tabs(["📊 Vista General", "➕ Agregar Ausencia", "✏️ Modificar / Eliminar"])
 
     with vista_general:
         if not df_compensados.empty:
@@ -42,8 +42,8 @@ def seccion_compensados(client, personal_list):
             today = pd.to_datetime(datetime.now().date())
 
             # Crear opciones de filtro
-            filter_options = ["Compensatorios en Curso", "Próximos Compensatorios", "Compensatorios Transcurridos", "Todos"]
-            default_filter = "Compensatorios en Curso"
+            filter_options = ["Ausencias en Curso", "Próximas Ausencias", "Ausencias Transcurridas", "Todos"]
+            default_filter = "Ausencias en Curso"
 
             selected_filter = st.selectbox(
                 "Filtrar por Estado",
@@ -54,17 +54,17 @@ def seccion_compensados(client, personal_list):
             # Aplicar filtro según la selección
             df_filtered = df_compensados.copy()
 
-            if selected_filter == "Compensatorios en Curso":
-                # Compensatorios que están actualmente en curso (desde <= hoy <= hasta)
+            if selected_filter == "Ausencias en Curso":
+                # Ausencias que están actualmente en curso (desde <= hoy <= hasta)
                 df_filtered = df_filtered[
                     (df_filtered['Desde fecha'] <= today) &
                     (df_filtered['Hasta fecha'] >= today)
                 ]
-            elif selected_filter == "Próximos Compensatorios":
-                # Compensatorios que aún no han empezado (desde > hoy)
+            elif selected_filter == "Próximas Ausencias":
+                # Ausencias que aún no han empezado (desde > hoy)
                 df_filtered = df_filtered[df_filtered['Desde fecha'] > today]
-            elif selected_filter == "Compensatorios Transcurridos":
-                # Compensatorios que ya terminaron (hasta < hoy)
+            elif selected_filter == "Ausencias Transcurridas":
+                # Ausencias que ya terminaron (hasta < hoy)
                 df_filtered = df_filtered[df_filtered['Hasta fecha'] < today]
             # "Todos" no aplica ningún filtro adicional
 
@@ -102,7 +102,7 @@ def seccion_compensados(client, personal_list):
         )
 
     with agregar_compensatorio:
-        tipo_compensatorio = st.radio("Tipo de compensatorio", ("Día completo", "Por horas"), key="tipo_compensatorio_radio")
+        tipo_compensatorio = st.radio("Tipo de ausencia", ("Día completo", "Por horas"), key="tipo_compensatorio_radio")
 
         # Entradas en vivo (fuera del form) para poder mostrar leyendas dinámicas
         if st.session_state.tipo_compensatorio_radio == "Día completo":
@@ -149,7 +149,7 @@ def seccion_compensados(client, personal_list):
         with st.form("compensados_form", clear_on_submit=True):
             nombre = st.selectbox("Apellido, Nombres", options=["Seleccione persona..."] + personal_list)
             fecha_solicitud = st.date_input("Fecha Solicitud", value=datetime.now())
-            tipo = st.selectbox("Tipo", options=["Compensatorio", "Certificado médico"])
+            tipo = st.selectbox("Tipo", options=["Compensatorio", "Certificado médico", "Permiso gremial", "Estudios", "Otro"])
 
             # Tomamos los valores seteados fuera del form
             desde_fecha = st.session_state.get("comp_desde_fecha")
@@ -185,7 +185,7 @@ def seccion_compensados(client, personal_list):
                         ]
                         sheet.append_row(new_row)
                         refresh_data(client, sheet_name)
-                        st.success("Registro de compensatorio agregado.")
+                        st.success("Registro de ausencia agregado.")
                         st.rerun()
                 else:
                     desde_hora_str = desde_hora.strftime('%H:%M') if desde_hora else ''
@@ -201,7 +201,7 @@ def seccion_compensados(client, personal_list):
                     ]
                     sheet.append_row(new_row)
                     refresh_data(client, sheet_name)
-                    st.success("Registro de compensatorio agregado.")
+                    st.success("Registro de ausencia agregado.")
                     st.rerun()
 
     with modificar_eliminar:
@@ -217,7 +217,7 @@ def seccion_compensados(client, personal_list):
 
                 es_dia_completo = pd.isna(record_data['Desde hora']) or record_data['Desde hora'] == ''
                 tipo_compensatorio_key = f"tipo_compensatorio_radio_{row_number_to_edit}"
-                tipo_compensatorio = st.radio("Tipo de compensatorio", ("Día completo", "Por horas"), index=0 if es_dia_completo else 1, key=tipo_compensatorio_key)
+                tipo_compensatorio = st.radio("Tipo de ausencia", ("Día completo", "Por horas"), index=0 if es_dia_completo else 1, key=tipo_compensatorio_key)
 
                 with st.form(f"edit_compensados_form_{row_number_to_edit}"):
                     nombre = st.selectbox("Apellido, Nombres", options=["Seleccione persona..."] + personal_list, index=personal_list.index(record_data["Apellido, Nombres"]) + 1 if record_data["Apellido, Nombres"] in personal_list else 0)

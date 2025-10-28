@@ -134,6 +134,9 @@ def main():
         page_name = os.path.splitext(page_file)[0]
         # Extraer el nombre legible del nombre del archivo (después del primer _)
         display_name = ' '.join(page_name.split('_')[1:])
+        # Ajuste de nombre visible: Compensados -> Ausencias
+        if page_name == '03_Compensados':
+            display_name = 'Ausencias'
         
         # Crear la página
         page_func = load_page(page_file)
