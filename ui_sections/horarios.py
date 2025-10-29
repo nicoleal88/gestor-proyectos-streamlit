@@ -424,11 +424,18 @@ def obtener_compensatorios_por_fecha():
                 id_empleado = next((k for k, v in ID_NOMBRE_MAP.items() if v == nombre_empleado), None)
 
                 if id_empleado:
+                    # Extraer detalle de tipo de ausencia de forma robusta
+                    detalle = ''
+                    for key in ['Tipo', 'tipo', 'Tipo de ausencia']:
+                        if key in compensados.columns and pd.notna(row.get(key, '')):
+                            detalle = str(row.get(key, '')).strip()
+                            break
                     registros.append({
                         'fecha': row['Desde fecha'],
                         'fecha_dt': pd.Timestamp(row['Desde fecha']),
                         'id_empleado': id_empleado,
                         'tipo': 'AUSENCIAS',
+                        'tipo_detalle': detalle,
                         'duracion_horas': duracion,
                         'fecha_formateada': pd.Timestamp(row['Desde fecha']).strftime('%a %d-%b-%Y'),
                         'hora_inicio': hora_inicio.strftime('%H:%M'),
@@ -453,11 +460,18 @@ def obtener_compensatorios_por_fecha():
 
                 fechas = pd.date_range(start=inicio, end=fin, freq='D')
                 for f in fechas:
+                    # Extraer detalle de tipo de ausencia de forma robusta
+                    detalle = ''
+                    for key in ['Tipo', 'tipo', 'Tipo de ausencia']:
+                        if key in compensados.columns and pd.notna(row.get(key, '')):
+                            detalle = str(row.get(key, '')).strip()
+                            break
                     registros.append({
                         'fecha': f.date(),
                         'fecha_dt': f,
                         'id_empleado': id_empleado,
                         'tipo': 'AUSENCIAS',
+                        'tipo_detalle': detalle,
                         'duracion_horas': 8.0,
                         'fecha_formateada': f.strftime('%a %d-%b-%Y'),
                         'hora_inicio': '',
@@ -1193,6 +1207,8 @@ def seccion_horarios(client, personal_list):
                 # Combinar datos de horarios y compensatorios
                 if not df_compensatorios.empty:
                     # Preparar datos de compensatorios para el merge
+                    if 'tipo_detalle' not in df_compensatorios.columns:
+                        df_compensatorios['tipo_detalle'] = ''
                     df_compensatorios_plot = df_compensatorios.rename(columns={
                         'tipo': 'tipo_combinado',
                         'fecha_dt': 'fecha_dt',
@@ -1204,7 +1220,10 @@ def seccion_horarios(client, personal_list):
                         if col not in df_compensatorios_plot.columns:
                             df_compensatorios_plot[col] = None
                     
-                    # Combinar con datos existentes
+                    # Asegurar columna 'tipo_detalle' en df_completo antes de concatenar
+                    if 'tipo_detalle' not in df_completo.columns:
+                        df_completo['tipo_detalle'] = ''
+                    # Combinar con datos existentes (manteniendo tipo_detalle)
                     df_completo = pd.concat([
                         df_completo,
                         df_compensatorios_plot[df_completo.columns.intersection(df_compensatorios_plot.columns)]
@@ -1256,6 +1275,22 @@ def seccion_horarios(client, personal_list):
                 
                 # Crear una copia del DataFrame para no modificar el original
                 df_plot = df_completo.copy()
+                # Asegurar columna para detalles de ausencias
+                if 'tipo_detalle' not in df_plot.columns:
+                    df_plot['tipo_detalle'] = ''
+                # Calcular detalle final para AUSENCIAS con fallback (por horas o día completo)
+                def _calc_detalle_final(row):
+                    if row.get('tipo_combinado') == 'AUSENCIAS':
+                        det = (row.get('tipo_detalle') or '').strip()
+                        h_ini = row.get('hora_inicio') or ''
+                        h_fin = row.get('hora_fin') or ''
+                        if det:
+                            return det
+                        if h_ini and h_fin:
+                            return f"Por horas ({h_ini}-{h_fin})"
+                        return "Día completo"
+                    return ''
+                df_plot['tipo_detalle_final'] = df_plot.apply(_calc_detalle_final, axis=1)
 
                 # -------- Gráfico integrado: LIBRO / RELOJ / AUSENCIAS / VACACIONES --------
                 fechas_unicas = sorted(df_plot['fecha'].unique()) if not df_plot.empty else []
@@ -1285,7 +1320,7 @@ def seccion_horarios(client, personal_list):
                     },
                     category_orders={'fecha': fechas_unicas, 'tipo_combinado': ["LIBRO", "RELOJ", "AUSENCIAS", "VACACIONES"]},
                     template='plotly_white',
-                    custom_data=['fecha_formateada', 'tipo_combinado', 'es_salida_campo']
+                    custom_data=['fecha_formateada', 'tipo_combinado', 'es_salida_campo', 'tipo_detalle_final']
                 )
 
                 # Aplicar un leve offset y ajuste de ancho a la serie de VACACIONES
@@ -1372,16 +1407,21 @@ def seccion_horarios(client, personal_list):
                                 fecha_texto = custom_data[0] if len(custom_data) > 0 else str(trace.x[i])
                                 tipo = custom_data[1] if len(custom_data) > 1 else 'DESCONOCIDO'
                                 horas = trace.y[i]
+                                detalle = custom_data[3] if len(custom_data) > 3 else ''
                                 
                                 if len(custom_data) > 2 and custom_data[2]:  # es_salida_campo es True
                                     hover_text = (
                                         f'<b>{fecha_texto}</b><br>' +
-                                        f'Tipo: {tipo}<br>' +
+                                        (f'Tipo: {detalle} ({tipo})<br>' if tipo == 'AUSENCIAS' and detalle else f'Tipo: {tipo}<br>') +
                                         f'Horas: {horas:.2f}<br>' +
                                         '<b>Posible salida al campo</b><br>'
                                     )
                                 else:
-                                    hover_text = f'<b>{fecha_texto}</b><br>Tipo: {tipo}<br>Horas: {horas:.2f}'
+                                    if tipo == 'AUSENCIAS':
+                                        label = detalle if detalle else 'AUSENCIAS'
+                                        hover_text = f'<b>{fecha_texto}</b><br>Tipo: {label} ({tipo})<br>Horas: {horas:.2f}'
+                                    else:
+                                        hover_text = f'<b>{fecha_texto}</b><br>Tipo: {tipo}<br>Horas: {horas:.2f}'
                                 
                                 hover_texts.append(hover_text)
                     
