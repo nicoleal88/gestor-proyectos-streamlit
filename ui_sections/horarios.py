@@ -424,12 +424,10 @@ def obtener_compensatorios_por_fecha():
                 id_empleado = next((k for k, v in ID_NOMBRE_MAP.items() if v == nombre_empleado), None)
 
                 if id_empleado:
-                    # Extraer detalle de tipo de ausencia de forma robusta
+                    # Extraer detalle exclusivamente desde la columna 'Tipo'
                     detalle = ''
-                    for key in ['Tipo', 'tipo', 'Tipo de ausencia']:
-                        if key in compensados.columns and pd.notna(row.get(key, '')):
-                            detalle = str(row.get(key, '')).strip()
-                            break
+                    if 'Tipo' in compensados.columns and pd.notna(row.get('Tipo', '')):
+                        detalle = str(row.get('Tipo', '')).strip()
                     registros.append({
                         'fecha': row['Desde fecha'],
                         'fecha_dt': pd.Timestamp(row['Desde fecha']),
@@ -460,12 +458,10 @@ def obtener_compensatorios_por_fecha():
 
                 fechas = pd.date_range(start=inicio, end=fin, freq='D')
                 for f in fechas:
-                    # Extraer detalle de tipo de ausencia de forma robusta
+                    # Extraer detalle exclusivamente desde la columna 'Tipo'
                     detalle = ''
-                    for key in ['Tipo', 'tipo', 'Tipo de ausencia']:
-                        if key in compensados.columns and pd.notna(row.get(key, '')):
-                            detalle = str(row.get(key, '')).strip()
-                            break
+                    if 'Tipo' in compensados.columns and pd.notna(row.get('Tipo', '')):
+                        detalle = str(row.get('Tipo', '')).strip()
                     registros.append({
                         'fecha': f.date(),
                         'fecha_dt': f,
@@ -523,11 +519,16 @@ def obtener_vacaciones_por_fecha():
 
                 # Expandir diariamente SIN incluir el día de regreso (fin no inclusivo)
                 for f in pd.date_range(start=inicio, end=fin - pd.Timedelta(days=1), freq='D'):
+                    # Extraer subtipo de vacaciones exclusivamente desde 'Tipo'
+                    vac_detalle = ''
+                    if 'Tipo' in vac.columns and pd.notna(row.get('Tipo', '')):
+                        vac_detalle = str(row.get('Tipo', '')).strip()
                     registros.append({
                         'fecha': f.date(),
                         'fecha_dt': f,
                         'id_empleado': id_emp,
                         'tipo': 'VACACIONES',
+                        'tipo_detalle': vac_detalle,
                         'duracion_horas': 8.0,
                         'fecha_formateada': f.strftime('%a %d-%b-%Y'),
                         'hora_inicio': '',
@@ -1167,8 +1168,8 @@ def seccion_horarios(client, personal_list):
                             (df_vacaciones_plot['fecha_dt'].dt.month == mes_seleccionado_dt.month) &
                             (df_vacaciones_plot['fecha_dt'].dt.year == mes_seleccionado_dt.year)
                         ]
-                    if df_vacaciones_plot.empty:
-                        st.info("No hay vacaciones para mostrar según los filtros seleccionados.")
+                    # if df_vacaciones_plot.empty:
+                    #     st.info("No hay vacaciones para mostrar según los filtros seleccionados.")
                 
                 # Asegurarse de que tenemos la columna 'tipo' correcta (puede ser 'tipo_x' o 'tipo_y')
                 tipo_col = 'tipo_x' if 'tipo_x' in df_plot.columns else 'tipo_y' if 'tipo_y' in df_plot.columns else 'tipo'
@@ -1237,6 +1238,8 @@ def seccion_horarios(client, personal_list):
                     for col in ['inicio_jornada', 'fin_jornada', 'minutos_trabajados', 'hora_entrada', 'hora_salida']:
                         if col not in df_vacaciones_plot.columns:
                             df_vacaciones_plot[col] = None
+                    if 'tipo_detalle' not in df_vacaciones_plot.columns:
+                        df_vacaciones_plot['tipo_detalle'] = ''
                     df_completo = pd.concat([
                         df_completo,
                         df_vacaciones_plot[df_completo.columns.intersection(df_vacaciones_plot.columns)]
@@ -1289,6 +1292,8 @@ def seccion_horarios(client, personal_list):
                         if h_ini and h_fin:
                             return f"Por horas ({h_ini}-{h_fin})"
                         return "Día completo"
+                    if row.get('tipo_combinado') == 'VACACIONES':
+                        return (row.get('tipo_detalle') or '').strip()
                     return ''
                 df_plot['tipo_detalle_final'] = df_plot.apply(_calc_detalle_final, axis=1)
 
@@ -1412,13 +1417,13 @@ def seccion_horarios(client, personal_list):
                                 if len(custom_data) > 2 and custom_data[2]:  # es_salida_campo es True
                                     hover_text = (
                                         f'<b>{fecha_texto}</b><br>' +
-                                        (f'Tipo: {detalle} ({tipo})<br>' if tipo == 'AUSENCIAS' and detalle else f'Tipo: {tipo}<br>') +
+                                        (f'Tipo: {detalle} ({tipo})<br>' if (tipo in ['AUSENCIAS','VACACIONES']) and detalle else f'Tipo: {tipo}<br>') +
                                         f'Horas: {horas:.2f}<br>' +
                                         '<b>Posible salida al campo</b><br>'
                                     )
                                 else:
-                                    if tipo == 'AUSENCIAS':
-                                        label = detalle if detalle else 'AUSENCIAS'
+                                    if tipo in ['AUSENCIAS','VACACIONES']:
+                                        label = detalle if detalle else tipo
                                         hover_text = f'<b>{fecha_texto}</b><br>Tipo: {label} ({tipo})<br>Horas: {horas:.2f}'
                                     else:
                                         hover_text = f'<b>{fecha_texto}</b><br>Tipo: {tipo}<br>Horas: {horas:.2f}'
