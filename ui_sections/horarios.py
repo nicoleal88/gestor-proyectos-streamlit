@@ -1224,11 +1224,11 @@ def seccion_horarios(client, personal_list):
                     # Asegurar columna 'tipo_detalle' en df_completo antes de concatenar
                     if 'tipo_detalle' not in df_completo.columns:
                         df_completo['tipo_detalle'] = ''
-                    # Combinar con datos existentes (manteniendo tipo_detalle)
-                    df_completo = pd.concat([
-                        df_completo,
-                        df_compensatorios_plot[df_completo.columns.intersection(df_compensatorios_plot.columns)]
-                    ], ignore_index=True)
+                    # Preparar frame a agregar con mismas columnas y orden que df_completo
+                    to_add = df_compensatorios_plot.reindex(columns=df_completo.columns)
+                    # Evitar concat con frames vacíos o totalmente NA para prevenir FutureWarning
+                    if not to_add.empty and not to_add.isna().all(axis=None):
+                        df_completo = pd.concat([df_completo, to_add], ignore_index=True)
                 if df_vacaciones_plot is not None and not df_vacaciones_plot.empty:
                     df_vacaciones_plot = df_vacaciones_plot.rename(columns={
                         'tipo': 'tipo_combinado',
@@ -1240,10 +1240,11 @@ def seccion_horarios(client, personal_list):
                             df_vacaciones_plot[col] = None
                     if 'tipo_detalle' not in df_vacaciones_plot.columns:
                         df_vacaciones_plot['tipo_detalle'] = ''
-                    df_completo = pd.concat([
-                        df_completo,
-                        df_vacaciones_plot[df_completo.columns.intersection(df_vacaciones_plot.columns)]
-                    ], ignore_index=True)
+                    # Preparar frame a agregar con mismas columnas y orden que df_completo
+                    to_add_vac = df_vacaciones_plot.reindex(columns=df_completo.columns)
+                    # Evitar concat con frames vacíos o totalmente NA para prevenir FutureWarning
+                    if not to_add_vac.empty and not to_add_vac.isna().all(axis=None):
+                        df_completo = pd.concat([df_completo, to_add_vac], ignore_index=True)
                 
                 # Ordenar por fecha y tipo
                 df_completo = df_completo.sort_values(['fecha', 'tipo_combinado'])
