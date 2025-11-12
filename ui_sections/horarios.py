@@ -654,6 +654,19 @@ def seccion_horarios(client, personal_list):
         
     DEFAULT_FOLDER_ID = "1mN0l4IOrsawz1p4p0K0OeHMm1dMe8RWS"
 
+    # Botón para refrescar lista de archivos desde Google Drive
+    if st.button("🔄 Actualizar lista"):
+        try:
+            st.cache_data.clear()
+        except Exception:
+            pass
+        # Limpiar estados relacionados para forzar recarga
+        st.session_state.pop('drive_csv_files', None)
+        st.session_state.pop('df_registros_horarios', None)
+        st.session_state.pop('drive_processed_ids', None)
+        st.session_state.pop('jornada_horarios', None)
+        st.rerun()
+
     # Limpiar caché al cargar la página
     if 'drive_csv_files' not in st.session_state or 'df_registros_horarios' not in st.session_state:
         st.session_state['drive_processed_ids'] = None
