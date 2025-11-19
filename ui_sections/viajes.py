@@ -12,6 +12,8 @@ import uuid
 import json
 from datetime import datetime
 from typing import List, Dict, Any, Optional
+import utm  # Added for coordinate conversion
+import math # Added for map jittering
 from google_sheets_client import get_sheet, get_sheet_data, refresh_data, update_cell_by_id
 
 # --- Constantes ---
@@ -76,7 +78,7 @@ def get_vehicles(client) -> pd.DataFrame:
     df = st.session_state.get("df_vehiculos", pd.DataFrame())
     if df.empty:
         df = get_sheet_data(client, SHEET_VEHICULOS)
-    expected = ["ID", "Nombre", "Tipo"]
+    expected = ["ID", "Nombre", "Tipo", "Kilometraje", "Combustible"]
     for col in expected:
         if col not in df.columns:
             df[col] = ""
@@ -141,6 +143,46 @@ def get_vehicle_color_map(client) -> Dict[str, list]:
                     idx += 1
                 color_map[vid] = rgb
     return color_map
+
+def load_tanks_from_file(filepath: str) -> pd.DataFrame:
+    """Lee el archivo de tanques (SD, LSID, Easting, Northing) y convierte a Lat/Lon (UTM 19H)."""
+    try:
+        # Leer archivo separado por tabs o espacios
+        df = pd.read_csv(filepath, sep='\t')
+        if df.empty:
+            return pd.DataFrame()
+        
+        # Limpiar nombres de columnas
+        df.columns = [c.strip() for c in df.columns]
+        
+        # Verificar columnas requeridas
+        req_cols = ['SD', 'LSID', 'Easting', 'Northing']
+        if not all(c in df.columns for c in req_cols):
+            return pd.DataFrame()
+
+        lats = []
+        lons = []
+        for _, row in df.iterrows():
+            try:
+                e = float(row['Easting'])
+                n = float(row['Northing'])
+                # Zona 19 South (Malargüe/Mendoza) -> utm.to_latlon(e, n, 19, 'H') 
+                # 'H' es banda sur? No, 'H' es banda latitud. 
+                # Para Argentina/Mendoza es Zona 19, Hemisferio Sur.
+                # utm.to_latlon(easting, northing, zone_number, zone_letter=None, northern=False)
+                lat, lon = utm.to_latlon(e, n, 19, northern=False)
+                lats.append(lat)
+                lons.append(lon)
+            except Exception:
+                lats.append(None)
+                lons.append(None)
+        
+        df['lat'] = lats
+        df['lon'] = lons
+        return df.dropna(subset=['lat', 'lon'])
+    except Exception as e:
+        st.error(f"Error cargando tanques: {e}")
+        return pd.DataFrame()
 
 def get_destinos_map(client) -> Dict[str, Dict[str, float]]:
     """Retorna un dict {Nombre: {"lat": float, "lon": float}} desde la hoja Destinos."""
@@ -247,16 +289,14 @@ def seccion_viajes(client, personal_list: List[str]):
     # Ensure DataFrame schemas exist in Sheets
     # _show_schema_info()
 
-    tab_gestion, tab_registro, tab_seguimiento, tab_mapa, tab_destinos = st.tabs([
-        "🚙 Vehículos",
+    tab_registro, tab_seguimiento, tab_mapa, tab_vehiculos, tab_destinos = st.tabs([
         "📝 Registro de Viajes",
         "📍 Seguimiento",
         "🗺️ Mapa",
+        "🚙 Vehículos",
         "📚 Destinos"
     ])
 
-    with tab_gestion:
-        _tab_vehiculos(client)
 
     with tab_registro:
         _tab_registro_viaje(client, personal_list)
@@ -267,33 +307,13 @@ def seccion_viajes(client, personal_list: List[str]):
     with tab_mapa:
         _tab_mapa(client)
 
+    with tab_vehiculos:
+        _tab_vehiculos(client)
+
     with tab_destinos:
         _tab_destinos(client)
 
 # --- Sub-secciones ---
-def _tab_vehiculos(client):
-    st.markdown("#### Gestión de Vehículos")
-    df = get_vehicles(client)
-    if df.empty:
-        st.info("No hay vehículos registrados.")
-    else:
-        st.dataframe(df, hide_index=True, width='stretch')
-
-    with st.form("vehiculos_form", clear_on_submit=True):
-        st.markdown("##### Registrar nuevo vehículo")
-        nombre = st.text_input("Nombre")
-        tipo = st.selectbox("Tipo", ["Auto", "Camioneta", "Camión", "Otro"])
-        color_hex = st.color_picker("Color (para mapa)", value="#007AFF")
-        if st.form_submit_button("Registrar Vehículo"):
-            sheet = get_sheet(client, SHEET_VEHICULOS)
-            if sheet is None:
-                st.error("No se pudo acceder a la hoja de Vehículos.")
-                return
-            vid = _ensure_id("veh")
-            sheet.append_row([vid, nombre.strip(), tipo, color_hex])
-            refresh_data(client, SHEET_VEHICULOS)
-            st.success("Vehículo registrado.")
-            st.rerun()
 
 def _tab_registro_viaje(client, personal_list: List[str]):
     st.markdown("#### Registro de Viaje")
@@ -303,22 +323,33 @@ def _tab_registro_viaje(client, personal_list: List[str]):
 
     col1, col2 = st.columns(2)
     veh_label = col1.selectbox("Vehículo", options=["Seleccionar..."] + veh_options)
+    
+    # Mostrar estado del vehículo seleccionado
+    if veh_label != "Seleccionar...":
+        vid_sel = veh_map.get(veh_label)
+        row_sel = vehiculos_df[vehiculos_df['ID'] == vid_sel].iloc[0]
+        km_txt = str(row_sel.get('Kilometraje', '')).strip()
+        fuel_txt = str(row_sel.get('Combustible', '')).strip()
+        if km_txt or fuel_txt:
+            col1.info(f"Estado actual: {km_txt or '?'} km | Combustible: {fuel_txt or '?'}")
 
+    col7, col8 = st.columns(2)
     people_options = personal_list or []
-    selected_people = col2.multiselect("Ocupantes (desde Personal)", options=people_options)
-    extra_people = st.text_input("Ocupantes adicionales (separados por coma)")
+    selected_people = col7.multiselect("Ocupantes (desde Personal)", options=people_options)
+    extra_people = col8.text_input("Ocupantes adicionales (separados por coma)")
 
     col3, col4 = st.columns(2)
     salida_fecha = col3.date_input("Fecha de salida", value=datetime.now().date())
-    salida_hora = col3.time_input("Hora de salida", value=datetime.now().time())
+    salida_hora = col4.time_input("Hora de salida", value=datetime.now().time())
 
+    col5, col6 = st.columns(2)
     destinos_map = get_destinos_map(client)
     destinos_options = sorted(list(destinos_map.keys())) + ["Otro"]
-    destino_principal = col4.selectbox("Destino principal", options=destinos_options, index=(destinos_options.index("Oficina") if "Oficina" in destinos_options else 0))
-    destino_principal_manual = st.text_input("Destino principal manual (si aplica)")
-    if destino_principal != "Otro" and destino_principal in destinos_map:
-        coords = destinos_map[destino_principal]
-        st.caption(f"Coordenadas destino principal: lat={coords['lat']}, lon={coords['lon']}")
+    destino_principal = col5.selectbox("Destino principal", options=destinos_options, index=(destinos_options.index("Oficina") if "Oficina" in destinos_options else 0))
+    # destino_principal_manual = col6.text_input("Destino principal manual (si aplica)")
+    # if destino_principal != "Otro" and destino_principal in destinos_map:
+    #     coords = destinos_map[destino_principal]
+    #     st.caption(f"Coordenadas destino principal: lat={coords['lat']}, lon={coords['lon']}")
 
     # Destinos intermedios eliminados por simplificación
     # destinos_intermedios_sel = st.multiselect("Seleccionar desde catálogo", options=sorted(list(destinos_map.keys())))
@@ -467,21 +498,71 @@ def _tab_seguimiento(client):
         # Report Location
         if add_trip_update(client, trip_id, float(coords['lat']), float(coords['lon']), notes):
             st.toast(f"Reportado en {sel_location}")
-            refresh_data(client, SHEET_VIAJES)
-            refresh_data(client, SHEET_VIAJES_UPDATES)
-            st.success("Ubicación actualizada.")
-            st.rerun()
         else:
             st.error("No se pudo realizar la actualización.")
 
     st.divider()
+    st.markdown("##### Finalizar Viaje")
+    st.caption("Seleccione el viaje activo arriba para finalizarlo.")
+    
+    # Datos de cierre
+    st.markdown("**Datos de cierre**")
+    
+    # Pre-fill mileage
+    current_km_val = 0
+    if trip_id:
+        try:
+            # Find vehicle for this trip
+            row_t = df_active[df_active[id_col].astype(str) == str(trip_id)]
+            if not row_t.empty:
+                vid_t = str(row_t.iloc[0][veh_col]).strip()
+                # Find vehicle data
+                if not df_veh.empty:
+                    row_v = df_veh[df_veh[v_id_col].astype(str) == vid_t]
+                    if not row_v.empty:
+                        k_val = row_v.iloc[0].get('Kilometraje', 0)
+                        # Handle potential string/empty values
+                        if k_val:
+                            current_km_val = int(float(str(k_val).replace(',', '.')))
+        except Exception:
+            pass
+
+    c_fin1, c_fin2 = st.columns(2)
+    km_final = c_fin1.number_input("Kilometraje final", min_value=0, step=1, value=current_km_val)
+    fuel_level = c_fin2.radio("Nivel de combustible", options=["1/8", "1/4", "3/8", "1/2", "5/8", "3/4", "7/8", "Lleno"], horizontal=True)
+
     if st.button("Finalizar Viaje", type="primary"):
-        if trip_id and complete_trip(client, trip_id):
+        if not trip_id:
+            st.error("No hay viaje seleccionado.")
+            return
+        
+        # Actualizar datos del vehículo
+        # Necesitamos el ID del vehículo del viaje seleccionado
+        # df_active tiene 'ID' y 'VehiculoID'
+        try:
+            row_trip = df_active[df_active[id_col].astype(str) == str(trip_id)].iloc[0]
+            veh_id_trip = str(row_trip[veh_col]).strip()
+            
+            # Actualizar Kilometraje
+            if km_final > 0:
+                update_cell_by_id(client, SHEET_VEHICULOS, veh_id_trip, "Kilometraje", km_final)
+            
+            # Actualizar Combustible
+            if fuel_level:
+                update_cell_by_id(client, SHEET_VEHICULOS, veh_id_trip, "Combustible", fuel_level)
+                
+        except Exception as e:
+            st.warning(f"No se pudieron actualizar datos del vehículo: {e}")
+
+        success = complete_trip(client, trip_id)
+        if success:
+            st.success(f"Viaje {trip_id} finalizado correctamente.")
+            st.session_state.pop("ultimo_trip_id", None)
             refresh_data(client, SHEET_VIAJES)
-            st.success("Viaje finalizado.")
+            refresh_data(client, SHEET_VEHICULOS) # Refresh vehicles to show new data
             st.rerun()
         else:
-            st.error("No se pudo finalizar el viaje.")
+            st.error("Error al finalizar el viaje.")
 
 def _tab_mapa(client):
     st.markdown("#### Visualización en mapa (todos los viajes activos)")
@@ -565,7 +646,7 @@ def _tab_mapa(client):
                 except Exception:
                     if isinstance(ppl_raw, str) and ppl_raw.strip():
                         ppl_list = [p.strip() for p in ppl_raw.split(',') if p.strip()]
-                trip_to_people[tid] = ", ".join([str(p).strip() for p in ppl_list if p])
+                trip_to_people[tid] = " - ".join([str(p).strip() for p in ppl_list if p])
     except Exception:
         pass
 
@@ -579,7 +660,9 @@ def _tab_mapa(client):
             break
     
     arc_rows = []
+    arc_rows = []
     vehicle_rows = []
+    raw_vehicle_rows = []
     
     # Pre-calcular secuencia de puntos por viaje
     # Estructura: [Estación Central] -> [Update 1] -> [Update 2] -> ...
@@ -643,7 +726,8 @@ def _tab_mapa(client):
                         "source": [start['lon'], start['lat']],
                         "target": [end['lon'], end['lat']],
                         "color": color,
-                        "trip_id": trip_id
+                        "trip_id": trip_id,
+                        "label": f"Trayecto: {veh_names.get(veh_id, veh_id)}\nTrip: {trip_id}"
                     })
             
             # Posición del vehículo (último punto)
@@ -655,7 +739,8 @@ def _tab_mapa(client):
                 personas_txt = trip_to_people.get(trip_id, '')
                 label_txt = f"Vehículo: {veh_names.get(veh_id, veh_id)}\nDestino: {destino_name}\nPersonas: {personas_txt}".strip()
                 
-                vehicle_rows.append({
+                # Collect raw data first
+                raw_vehicle_rows.append({
                     "lat": last_pt['lat'],
                     "lon": last_pt['lon'],
                     "color": color,
@@ -665,6 +750,27 @@ def _tab_mapa(client):
                     "tipo": source_type,
                     "label": label_txt,
                 })
+
+    # Process vehicle overlap (Jitter)
+    groups = {}
+    for r in raw_vehicle_rows:
+        k = (r['lat'], r['lon'])
+        if k not in groups: groups[k] = []
+        groups[k].append(r)
+    
+    for k, rows in groups.items():
+        if len(rows) == 1:
+            vehicle_rows.append(rows[0])
+        else:
+            # Apply jitter
+            lat0, lon0 = k
+            radius = 0.0002 # Approx 20m
+            angle_step = 2 * math.pi / len(rows)
+            for i, row in enumerate(rows):
+                angle = i * angle_step
+                row['lat'] = lat0 + radius * math.cos(angle)
+                row['lon'] = lon0 + radius * math.sin(angle)
+                vehicle_rows.append(row)
 
     # Construir data_rows para layer_updates (Trail)
     data_rows = []
@@ -762,20 +868,20 @@ def _tab_mapa(client):
         return s.apply(_f)
 
     # Calcular centro
-    center_lat, center_lon = -34.603722, -58.381592 # Default
-    if vehicle_rows:
-        lats = [r['lat'] for r in vehicle_rows]
-        lons = [r['lon'] for r in vehicle_rows]
-        if lats and lons:
-            center_lat = sum(lats) / len(lats)
-            center_lon = sum(lons) / len(lons)
+    center_lat, center_lon = -35.250000, -69.300000 # Default
+    # if vehicle_rows:
+    #     lats = [r['lat'] for r in vehicle_rows]
+    #     lons = [r['lon'] for r in vehicle_rows]
+    #     if lats and lons:
+    #         center_lat = sum(lats) / len(lats)
+    #         center_lon = sum(lons) / len(lons)
 
     # Vista fija perpendicular (top-down)
-    pitch_val = 0
+    pitch_val = 30
     view_state = pdk.ViewState(
         latitude=center_lat,
         longitude=center_lon,
-        zoom=11,
+        zoom=8.8,
         pitch=pitch_val,
         bearing=0,
     )
@@ -833,8 +939,36 @@ def _tab_mapa(client):
     except Exception:
         pass
 
-    # Orden de capas: Arcos (fondo), Referencias, Updates (trail), Vehículos (top)
-    layers = ([layer_arcs] if layer_arcs is not None else []) + \
+    # Capa de Tanques (SD.txt)
+    layer_tanks = None
+    try:
+        df_tanks = load_tanks_from_file("/home/nleal/gestor_proyectos_streamlit/docs/sd.txt")
+        if not df_tanks.empty:
+            # Color: Gris azulado semi-transparente [100, 120, 140, 100]
+            df_tanks['color'] = [[100, 120, 140, 100]] * len(df_tanks)
+            df_tanks['radius'] = 10
+            df_tanks['label'] = df_tanks.apply(lambda x: f"{x['SD']} ({x['LSID']})", axis=1)
+            
+            layer_tanks = pdk.Layer(
+                "ScatterplotLayer",
+                df_tanks,
+                get_position='[lon, lat]',
+                get_fill_color='color',
+                get_radius='radius',
+                radius_units='meters',
+                radius_min_pixels=2,
+                radius_max_pixels=4,
+                pickable=True,
+                stroked=True,
+                get_line_color=[50, 50, 50, 80],
+                line_width_min_pixels=1,
+            )
+    except Exception:
+        pass
+
+    # Orden de capas: Tanques (fondo), Arcos, Referencias, Updates (trail), Vehículos (top)
+    layers = ([layer_tanks] if layer_tanks is not None else []) + \
+             ([layer_arcs] if layer_arcs is not None else []) + \
              ([layer_reference] if layer_reference is not None else []) + \
              ([layer_updates] if layer_updates is not None else []) + \
              ([layer_vehicles] if layer_vehicles is not None else [])
@@ -911,14 +1045,14 @@ def _tab_mapa(client):
             except Exception:
                 if isinstance(ppl_raw, str) and ppl_raw.strip():
                     ppl_list = [p.strip() for p in ppl_raw.split(',') if p.strip()]
-            ppl_txt = ", ".join([str(p).strip() for p in ppl_list if p])
+            ppl_txt = " - ".join([str(p).strip() for p in ppl_list if p])
             destino = str(row.get(principal_col, '')).strip()
             loc = last_by_trip.get(tid)
             loc_name = _nearest_dest_name(loc.get('lat') if loc else None, loc.get('lon') if loc else None)
             loc_txt = f"Ubicación: {loc_name}" if loc_name else (f"Destino: {destino}" if destino else "Sin ubicación")
             line = f"- {vname} - {ppl_txt} - {loc_txt}" if ppl_txt else f"- {vname} - {loc_txt}"
             lines.append(line)
-        st.markdown("\n".join(lines) if lines else "Sin viajes para listar")
+        st.markdown("\n\n".join(lines) if lines else "Sin viajes para listar")
 
 # --- Info de esquema ---
 def _show_schema_info():
@@ -982,4 +1116,28 @@ def _tab_destinos(client):
             sheet.append_row([nombre.strip(), f"{lat:.6f}", f"{lon:.6f}"])
             refresh_data(client, SHEET_DESTINOS)
             st.success("Destino agregado correctamente.")
+            st.rerun()
+
+def _tab_vehiculos(client):
+    st.markdown("#### Gestión de Vehículos")
+    df = get_vehicles(client)
+    if df.empty:
+        st.info("No hay vehículos registrados.")
+    else:
+        st.dataframe(df[["Nombre", "Tipo", "Kilometraje", "Combustible"]], hide_index=True, width='stretch')
+
+    with st.form("vehiculos_form", clear_on_submit=True):
+        st.markdown("##### Registrar nuevo vehículo")
+        nombre = st.text_input("Nombre")
+        tipo = st.selectbox("Tipo", ["Camioneta", "Auto", "Camión", "Otro"])
+        color_hex = st.color_picker("Color (para mapa)", value="#007AFF")
+        if st.form_submit_button("Registrar Vehículo"):
+            sheet = get_sheet(client, SHEET_VEHICULOS)
+            if sheet is None:
+                st.error("No se pudo acceder a la hoja de Vehículos.")
+                return
+            vid = _ensure_id("veh")
+            sheet.append_row([vid, nombre.strip(), tipo, color_hex])
+            refresh_data(client, SHEET_VEHICULOS)
+            st.success("Vehículo registrado.")
             st.rerun()

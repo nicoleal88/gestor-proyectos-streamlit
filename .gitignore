@@ -19,3 +19,4 @@ log/
 # Deployment logs (no subir al repositorio)
 logs/deploy.log
 logs/*.log
+docs/sd.txt
