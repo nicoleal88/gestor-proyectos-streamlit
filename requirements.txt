@@ -24,6 +24,9 @@ altair>=5.0.0
 icalendar>=6.0.0
 pytz>=2023.3
 
+# Mapping
+pydeck>=0.8.0
+
 # Authentication
 python-jose[cryptography]>=3.3.0
 

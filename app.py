@@ -23,6 +23,7 @@ PAGE_PERMISSIONS = {
     '05_Recordatorios': 'recordatorios',
     '06_Calendario': 'calendario',
     '07_Horarios': 'horarios',
+    '08_Viajes': 'horarios',
     '10_Utilidades_Carga_y_Merge': 'utilidades'
 }
 
@@ -36,6 +37,7 @@ PAGE_ICONS = {
     '05_Recordatorios': '🔔',
     '06_Calendario': '📆',
     '07_Horarios': '👥',
+    '08_Viajes': '🚗',
     '10_Utilidades_Carga_y_Merge': '🧰'
 }
 

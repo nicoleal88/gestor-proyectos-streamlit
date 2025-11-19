@@ -35,7 +35,7 @@ def get_sheet(client, sheet_name):
 # --- FUNCIONES DE DATOS ---
 def init_session_state(client):
     """Inicializa el estado de la sesión para cada hoja de cálculo."""
-    sheets = ["Tareas", "Vacaciones", "Compensados", "Notas", "Recordatorios", "Personal", "Eventos"]
+    sheets = ["Tareas", "Vacaciones", "Compensados", "Notas", "Recordatorios", "Personal", "Eventos", "Vehiculos", "Viajes", "ViajesUpdates", "Destinos"]
     for sheet_name in sheets:
         if f"df_{sheet_name.lower()}" not in st.session_state:
             st.session_state[f"df_{sheet_name.lower()}"] = get_sheet_data(client, sheet_name)
@@ -45,7 +45,10 @@ def get_sheet_data(client, sheet_name):
     sheet = get_sheet(client, sheet_name)
     if sheet:
         try:
-            return pd.DataFrame(sheet.get_all_records())
+            df = pd.DataFrame(sheet.get_all_records())
+            # Normalizar encabezados (espacios accidentales)
+            df.columns = [str(c).strip() for c in df.columns]
+            return df
         except Exception as e:
             st.error(f"Error al leer los registros de la hoja '{sheet_name}': {e}")
             return pd.DataFrame()
@@ -63,28 +66,52 @@ def update_cell_by_id(client, sheet_name, id_to_find, column_name, new_value):
         return False
     try:
         df = get_sheet_data(client, sheet_name)
+        if not df.empty:
+            # Asegurar columnas normalizadas
+            df.columns = [str(c).strip() for c in df.columns]
         if df.empty or 'ID' not in df.columns:
             st.error(f"La hoja '{sheet_name}' no tiene una columna 'ID' o está vacía.")
             return False
 
         # Asegurarse de que el tipo de dato del ID es consistente
-        df['ID'] = df['ID'].astype(str)
-        id_to_find = str(id_to_find)
+        df['ID'] = df['ID'].astype(str).str.strip()
+        id_to_find = str(id_to_find).strip()
 
+        # Intento 1: búsqueda en DataFrame local
         row_index = df[df['ID'] == id_to_find].index
-        if not row_index.any():
-            st.warning(f"No se encontró ninguna fila con ID '{id_to_find}' en '{sheet_name}'.")
-            return False
 
-        # gspread usa índices basados en 1, y la primera fila es la cabecera
-        row_to_update = row_index[0] + 2
-
-        headers = sheet.row_values(1)
+        headers_raw = sheet.row_values(1)
+        headers = [str(h).strip() for h in headers_raw]
         if column_name not in headers:
             st.error(f"La columna '{column_name}' no existe en la hoja '{sheet_name}'.")
             return False
         
         col_to_update = headers.index(column_name) + 1
+
+        # gspread usa índices basados en 1, y la primera fila es la cabecera
+        if row_index.any():
+            row_to_update = row_index[0] + 2
+        else:
+            # Intento 2: búsqueda directa en la hoja (fallback)
+            try:
+                id_col_idx = headers.index('ID') + 1 if 'ID' in headers else None
+            except ValueError:
+                id_col_idx = None
+
+            if not id_col_idx:
+                st.warning(f"No se encontró la columna 'ID' en los encabezados de '{sheet_name}'.")
+                return False
+
+            matches = sheet.findall(id_to_find)
+            row_to_update = None
+            for cell in matches:
+                if cell.col == id_col_idx:
+                    row_to_update = cell.row
+                    break
+
+            if not row_to_update:
+                st.warning(f"No se encontró ninguna fila con ID '{id_to_find}' en '{sheet_name}'.")
+                return False
 
         sheet.update_cell(row_to_update, col_to_update, new_value)
         return True
