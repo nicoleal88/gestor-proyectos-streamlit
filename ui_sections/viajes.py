@@ -317,8 +317,49 @@ def seccion_viajes(client, personal_list: List[str]):
 
 def _tab_registro_viaje(client, personal_list: List[str]):
     st.markdown("#### Registro de Viaje")
+    
+    # Identificar recursos ocupados
+    df_active = get_active_trips(client)
+    occupied_veh_ids = set()
+    occupied_people = set()
+    
+    if not df_active.empty:
+        # Vehículos ocupados
+        v_cols = {c.lower().strip(): c for c in df_active.columns}
+        veh_col = v_cols.get('vehiculoid') or v_cols.get('vehicleid') or 'VehiculoID'
+        if veh_col in df_active.columns:
+            occupied_veh_ids = set(df_active[veh_col].astype(str).str.strip())
+            
+        # Personas ocupadas
+        personas_col = v_cols.get('personas(json)') or v_cols.get('personas') or 'Personas(JSON)'
+        if personas_col in df_active.columns:
+            for _, row in df_active.iterrows():
+                ppl_raw = row.get(personas_col, '[]')
+                try:
+                    if isinstance(ppl_raw, str):
+                        # Intentar JSON primero, luego split por coma
+                        try:
+                            ppl_list = json.loads(ppl_raw)
+                        except json.JSONDecodeError:
+                            ppl_list = [p.strip() for p in ppl_raw.split(',') if p.strip()]
+                    elif isinstance(ppl_raw, list):
+                        ppl_list = ppl_raw
+                    else:
+                        ppl_list = []
+                except Exception:
+                    ppl_list = []
+                
+                if isinstance(ppl_list, list):
+                    for p in ppl_list:
+                        occupied_people.add(str(p).strip())
+
     vehiculos_df = get_vehicles(client)
-    veh_map = {f"{row['Nombre']} ({row['Tipo']})": row['ID'] for _, row in vehiculos_df.iterrows()}
+    # Filtrar vehículos ocupados
+    veh_map = {
+        f"{row['Nombre']} ({row['Tipo']})": row['ID'] 
+        for _, row in vehiculos_df.iterrows() 
+        if str(row['ID']).strip() not in occupied_veh_ids
+    }
     veh_options = list(veh_map.keys())
 
     col1, col2 = st.columns(2)
@@ -334,7 +375,7 @@ def _tab_registro_viaje(client, personal_list: List[str]):
             col1.info(f"Estado actual: {km_txt or '?'} km | Combustible: {fuel_txt or '?'}")
 
     col7, col8 = st.columns(2)
-    people_options = personal_list or []
+    people_options = [p for p in (personal_list or []) if str(p).strip() not in occupied_people]
     selected_people = col7.multiselect("Ocupantes (desde Personal)", options=people_options)
     extra_people = col8.text_input("Ocupantes adicionales (separados por coma)")
 
@@ -565,13 +606,13 @@ def _tab_seguimiento(client):
             st.error("Error al finalizar el viaje.")
 
 def _tab_mapa(client):
-    st.markdown("#### Visualización en mapa (todos los viajes activos)")
+    # st.markdown("#### Visualización en mapa (todos los viajes activos)")
     # Depuración deshabilitada
 
     df_active = get_active_trips(client)
-    if df_active.empty:
-        st.info("No hay viajes activos.")
-        return
+    # if df_active.empty:
+    #     st.info("No hay viajes activos.")
+    #     return
 
     # Preparar colores y nombres por vehículo
     veh_colors = get_vehicle_color_map(client)
@@ -725,7 +766,7 @@ def _tab_mapa(client):
                     arc_rows.append({
                         "source": [start['lon'], start['lat']],
                         "target": [end['lon'], end['lat']],
-                        "color": color,
+                        "color": color + [128],
                         "trip_id": trip_id,
                         "label": f"Trayecto: {veh_names.get(veh_id, veh_id)}\nTrip: {trip_id}"
                     })
@@ -936,6 +977,18 @@ def _tab_mapa(client):
                     line_width_min_pixels=1,
                     pickable=True,
                 )
+                
+                # Capa de Texto para Referencias
+                layer_reference_text = pdk.Layer(
+                    "TextLayer",
+                    df_ref,
+                    get_position='[lon, lat]',
+                    get_text='destino',
+                    get_color=[255, 255, 255],
+                    get_size=14,
+                    get_alignment_baseline="'bottom'",
+                    pickable=False,
+                )
     except Exception:
         pass
 
@@ -966,10 +1019,11 @@ def _tab_mapa(client):
     except Exception:
         pass
 
-    # Orden de capas: Tanques (fondo), Arcos, Referencias, Updates (trail), Vehículos (top)
+    # Orden de capas: Tanques (fondo), Arcos, Referencias, Texto Referencias, Updates (trail), Vehículos (top)
     layers = ([layer_tanks] if layer_tanks is not None else []) + \
              ([layer_arcs] if layer_arcs is not None else []) + \
              ([layer_reference] if layer_reference is not None else []) + \
+             ([layer_reference_text] if layer_reference_text is not None else []) + \
              ([layer_updates] if layer_updates is not None else []) + \
              ([layer_vehicles] if layer_vehicles is not None else [])
     if not layers:
@@ -983,8 +1037,8 @@ def _tab_mapa(client):
     col_map, col_list = st.columns([5, 2])
     r = pdk.Deck(map_style=map_style_url, layers=layers, initial_view_state=view_state, tooltip=tooltip)
     with col_map:
-        st.caption(f"Centro del mapa: lat={center_lat:.5f}, lon={center_lon:.5f}")
-        st.pydeck_chart(r, use_container_width=True, height=520)
+        # st.caption(f"Centro del mapa: lat={center_lat:.5f}, lon={center_lon:.5f}")
+        st.pydeck_chart(r, use_container_width=True, height=700)
 
     # Lista de viajes activos: Vehículo - Personas - Destino/Ubicación actual
     with col_list:
