@@ -465,6 +465,34 @@ def _tab_seguimiento(client):
     trip_id = trip_map.get(trip_label)
 
     # Última ubicación del viaje seleccionado (solo lectura)
+    def _format_ts_human(ts_str: str) -> str:
+        if not ts_str:
+            return ""
+        try:
+            ts_clean = ts_str.replace("Z", "+00:00") if ts_str.endswith("Z") else ts_str
+            dt = datetime.fromisoformat(ts_clean)
+        except Exception:
+            return ts_str
+        try:
+            tz = pytz.timezone(TZ_DEFAULT)
+            if dt.tzinfo is None:
+                dt = tz.localize(dt)
+            else:
+                dt = dt.astimezone(tz)
+            now = datetime.now(tz)
+        except Exception:
+            return ts_str
+
+        d_date = dt.date()
+        today = now.date()
+        if d_date == today:
+            prefix = "hoy"
+        elif (today - d_date).days == 1:
+            prefix = "ayer"
+        else:
+            prefix = dt.strftime("%d/%m/%Y")
+        return f"{prefix} a las {dt.strftime('%H:%M')} hs"
+
     last_text = "Sin ubicaciones reportadas"
     last_lat, last_lon = None, None
     try:
@@ -491,11 +519,13 @@ def _tab_seguimiento(client):
                         if abs(dcoords['lat'] - lat_v) <= thr and abs(dcoords['lon'] - lon_v) <= thr:
                             loc_name = dname
                             break
-                    
+
+                    ts_human = _format_ts_human(ts_v) if ts_v else ""
                     if loc_name:
-                        last_text = f"{loc_name} ({ts_v})" if ts_v else loc_name
+                        last_text = f"{loc_name} ({ts_human})".strip() if ts_human else loc_name
                     else:
-                        last_text = f"{lat_v:.6f}, {lon_v:.6f}  {('('+ts_v+')') if ts_v else ''}"
+                        extra = f" ({ts_human})" if ts_human else ""
+                        last_text = f"{lat_v:.6f}, {lon_v:.6f}{extra}"
     except Exception:
         pass
     st.text_input("Última ubicación", value=last_text, disabled=True)
@@ -928,6 +958,7 @@ def _tab_mapa(client):
     )
     # Capa de puntos de referencia (siempre visibles) desde hoja Destinos con bandera booleana
     layer_reference = None
+    layer_reference_text = None
     try:
         df_dest = st.session_state.get("df_destinos", pd.DataFrame())
         if df_dest.empty:
