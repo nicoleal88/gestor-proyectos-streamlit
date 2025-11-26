@@ -380,8 +380,14 @@ def _tab_registro_viaje(client, personal_list: List[str]):
     extra_people = col8.text_input("Ocupantes adicionales (separados por coma)")
 
     col3, col4 = st.columns(2)
-    salida_fecha = col3.date_input("Fecha de salida", value=datetime.now().date())
-    salida_hora = col4.time_input("Hora de salida", value=datetime.now().time())
+    # Inicializar fecha/hora solo una vez para que el usuario pueda editarlas sin que se reseteen
+    if "salida_fecha" not in st.session_state:
+        st.session_state["salida_fecha"] = datetime.now().date()
+    if "salida_hora" not in st.session_state:
+        st.session_state["salida_hora"] = datetime.now().time()
+
+    salida_fecha = col3.date_input("Fecha de salida", value=st.session_state["salida_fecha"], key="salida_fecha")
+    salida_hora = col4.time_input("Hora de salida", value=st.session_state["salida_hora"], key="salida_hora")
 
     col5, col6 = st.columns(2)
     destinos_map = get_destinos_map(client)
@@ -402,7 +408,8 @@ def _tab_registro_viaje(client, personal_list: List[str]):
             return
         vehicle_id = veh_map.get(veh_label)
         final_people = [p for p in selected_people if p] + [p.strip() for p in (extra_people.split(',') if extra_people else []) if p.strip()]
-        principal = destino_principal_manual.strip() if destino_principal == "Otro" and destino_principal_manual.strip() else destino_principal
+        # Uso directo del destino seleccionado (se eliminó el campo manual)
+        principal = destino_principal
         intermedios = [] # Simplificado: sin intermedios
         salida_dt = datetime.combine(salida_fecha, salida_hora)
         trip_id = create_trip(client, vehicle_id, final_people, principal, intermedios, salida_dt)
@@ -1013,7 +1020,7 @@ def _tab_mapa(client):
                 layer_reference_text = pdk.Layer(
                     "TextLayer",
                     df_ref,
-                    get_position='[lon, lat]',
+                    get_position='[lon, lat+0.005]',
                     get_text='destino',
                     get_color=[255, 255, 255],
                     get_size=14,
