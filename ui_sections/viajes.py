@@ -1033,7 +1033,10 @@ def _tab_mapa(client):
     # Capa de Tanques (SD.txt)
     layer_tanks = None
     try:
-        df_tanks = load_tanks_from_file("/home/nleal/gestor_proyectos_streamlit/docs/sd.txt")
+        # Use relative path to docs/sd.txt
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        tanks_path = os.path.join(current_dir, "..", "docs", "sd.txt")
+        df_tanks = load_tanks_from_file(tanks_path)
         if not df_tanks.empty:
             # Color: Gris azulado semi-transparente [100, 120, 140, 100]
             df_tanks['color'] = [[100, 120, 140, 100]] * len(df_tanks)
