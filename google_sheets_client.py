@@ -35,10 +35,37 @@ def get_sheet(client, sheet_name):
 # --- FUNCIONES DE DATOS ---
 def init_session_state(client):
     """Inicializa el estado de la sesión para cada hoja de cálculo."""
-    sheets = ["Tareas", "Vacaciones", "Compensados", "Notas", "Recordatorios", "Personal", "Eventos", "Vehiculos", "Viajes", "ViajesUpdates", "Destinos"]
+    sheets = ["Tareas", "Vacaciones", "Compensados", "Notas", "Recordatorios", "Personal", "Eventos", "Vehiculos", "Viajes", "ViajesUpdates", "Destinos", "Feriados_Manuales"]
     for sheet_name in sheets:
         if f"df_{sheet_name.lower()}" not in st.session_state:
-            st.session_state[f"df_{sheet_name.lower()}"] = get_sheet_data(client, sheet_name)
+            # Para Feriados_Manuales, si no existe no mostramos error crítico
+            if sheet_name == "Feriados_Manuales":
+                try:
+                    st.session_state[f"df_{sheet_name.lower()}"] = get_sheet_data_silent(client, sheet_name)
+                except:
+                    st.session_state[f"df_{sheet_name.lower()}"] = pd.DataFrame()
+            else:
+                st.session_state[f"df_{sheet_name.lower()}"] = get_sheet_data(client, sheet_name)
+
+def get_sheet_silent(client, sheet_name):
+    """Versión silenciosa de get_sheet para hojas opcionales."""
+    try:
+        sheet = client.open("GestorProyectosStreamlit").worksheet(sheet_name)
+        return sheet
+    except:
+        return None
+
+def get_sheet_data_silent(client, sheet_name):
+    """Versión silenciosa de get_sheet_data."""
+    sheet = get_sheet_silent(client, sheet_name)
+    if sheet:
+        try:
+            df = pd.DataFrame(sheet.get_all_records())
+            df.columns = [str(c).strip() for c in df.columns]
+            return df
+        except:
+            return pd.DataFrame()
+    return pd.DataFrame()
 
 def get_sheet_data(client, sheet_name):
     """Obtiene los datos de una hoja y los devuelve como un DataFrame."""
@@ -61,9 +88,12 @@ def refresh_data(client, sheet_name):
 
 def refresh_all_data(client):
     """Refresca todos los DataFrames del estado de la sesión."""
-    sheets = ["Tareas", "Vacaciones", "Compensados", "Notas", "Recordatorios", "Personal", "Eventos", "Vehiculos", "Viajes", "ViajesUpdates", "Destinos"]
+    sheets = ["Tareas", "Vacaciones", "Compensados", "Notas", "Recordatorios", "Personal", "Eventos", "Vehiculos", "Viajes", "ViajesUpdates", "Destinos", "Feriados_Manuales"]
     for sheet_name in sheets:
-        st.session_state[f"df_{sheet_name.lower()}"] = get_sheet_data(client, sheet_name)
+        if sheet_name == "Feriados_Manuales":
+            st.session_state[f"df_{sheet_name.lower()}"] = get_sheet_data_silent(client, sheet_name)
+        else:
+            st.session_state[f"df_{sheet_name.lower()}"] = get_sheet_data(client, sheet_name)
     st.cache_data.clear()
 
 def update_cell_by_id(client, sheet_name, id_to_find, column_name, new_value):

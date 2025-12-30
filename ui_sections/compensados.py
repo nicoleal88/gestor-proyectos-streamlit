@@ -8,6 +8,7 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 from google_sheets_client import get_sheet, refresh_data
+from utils.date_utils import format_duracion_licencia
 
 def seccion_compensados(client, personal_list):
     st.subheader("⏱️ Registro de Ausencias")
@@ -110,13 +111,13 @@ def seccion_compensados(client, personal_list):
             desde_fecha_live = col1.date_input("Desde fecha", key="comp_desde_fecha", value=datetime.now().date())
             hasta_fecha_live = col2.date_input("Hasta fecha", key="comp_hasta_fecha", value=datetime.now().date())
 
-            # Cálculo en vivo de días (inclusive)
+            # Cálculo en vivo de días con API de feriados (inclusive)
             if hasta_fecha_live < desde_fecha_live:
                 st.warning("La fecha 'Hasta' es anterior a 'Desde'.")
-                dias = 0
             else:
-                dias = (hasta_fecha_live - desde_fecha_live).days + 1
-                st.info(f"Días comprendidos: {dias}")
+                msg_duracion, dias_corrido, dias_habiles = format_duracion_licencia(desde_fecha_live, hasta_fecha_live)
+                st.markdown(msg_duracion)
+                st.success(f"Período confirmado: {dias_corrido} días de corrido ({dias_habiles} hábiles).")
 
             # Valores por horas no aplican aquí
             st.session_state.setdefault("comp_desde_hora", None)
@@ -228,6 +229,13 @@ def seccion_compensados(client, personal_list):
                         col1, col2 = st.columns(2)
                         desde_fecha = col1.date_input("Desde fecha", value=pd.to_datetime(record_data["Desde fecha"]))
                         hasta_fecha = col2.date_input("Hasta fecha", value=pd.to_datetime(record_data["Hasta fecha"]))
+                        
+                        if hasta_fecha >= desde_fecha:
+                            msg_edit, d_c_edit, d_h_edit = format_duracion_licencia(desde_fecha, hasta_fecha)
+                            st.info(msg_edit)
+                        else:
+                            st.warning("La fecha 'Hasta' es anterior a 'Desde'.")
+                            
                         desde_hora = None
                         hasta_hora = None
                     else: # Por horas
