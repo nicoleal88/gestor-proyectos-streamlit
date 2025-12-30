@@ -347,6 +347,67 @@ def mostrar_seccion_bienvenida():
     st.subheader(f"📅 {fecha}")
     st.markdown("---")
 
+    # --- RESUMEN DE PERSONAL EN CURSO ---
+    df_vacaciones = st.session_state.get('df_vacaciones', pd.DataFrame())
+    df_compensados = st.session_state.get('df_compensados', pd.DataFrame())
+    
+    today = pd.to_datetime(datetime.now().date())
+    
+    # Vacaciones en curso (Inicio <= Hoy < Regreso)
+    vac_en_curso = pd.DataFrame()
+    if not df_vacaciones.empty and 'Fecha inicio' in df_vacaciones.columns:
+        df_vac_tmp = df_vacaciones.copy()
+        df_vac_tmp['Fecha inicio'] = pd.to_datetime(df_vac_tmp['Fecha inicio'], errors='coerce')
+        df_vac_tmp['Fecha regreso'] = pd.to_datetime(df_vac_tmp['Fecha regreso'], errors='coerce')
+        
+        vac_en_curso = df_vac_tmp[
+            (df_vac_tmp['Fecha inicio'] <= today) & 
+            (df_vac_tmp['Fecha regreso'] > today)
+        ].copy()
+        
+        if not vac_en_curso.empty:
+            vac_en_curso = vac_en_curso[['Apellido, Nombres', 'Fecha inicio', 'Fecha regreso']]
+            vac_en_curso.columns = ['Personal', 'Inicio', 'Regreso']
+            vac_en_curso['Inicio'] = vac_en_curso['Inicio'].dt.strftime('%d/%m/%Y')
+            vac_en_curso['Regreso'] = vac_en_curso['Regreso'].dt.strftime('%d/%m/%Y')
+
+    # Ausencias en curso (Desde <= Hoy <= Hasta)
+    comp_en_curso = pd.DataFrame()
+    if not df_compensados.empty and 'Desde fecha' in df_compensados.columns:
+        df_comp_tmp = df_compensados.copy()
+        df_comp_tmp['Desde fecha'] = pd.to_datetime(df_comp_tmp['Desde fecha'], errors='coerce')
+        df_comp_tmp['Hasta fecha'] = pd.to_datetime(df_comp_tmp['Hasta fecha'], errors='coerce')
+        
+        comp_en_curso = df_comp_tmp[
+            (df_comp_tmp['Desde fecha'] <= today) & 
+            (df_comp_tmp['Hasta fecha'] >= today)
+        ].copy()
+        
+        if not comp_en_curso.empty:
+            comp_en_curso = comp_en_curso[['Apellido, Nombres', 'Desde fecha', 'Hasta fecha']]
+            comp_en_curso.columns = ['Personal', 'Desde', 'Hasta']
+            comp_en_curso['Desde'] = comp_en_curso['Desde'].dt.strftime('%d/%m/%Y')
+            comp_en_curso['Hasta'] = comp_en_curso['Hasta'].dt.strftime('%d/%m/%Y')
+
+    # Mostrar sección solo si hay datos para mostrar
+    if not vac_en_curso.empty or not comp_en_curso.empty:
+        col_vac, col_comp = st.columns(2)
+        
+        with col_vac:
+            st.markdown("#### 📅 Vacaciones en curso")
+            if not vac_en_curso.empty:
+                st.dataframe(vac_en_curso, hide_index=True, width='stretch')
+            else:
+                st.info("No hay vacaciones en curso")
+                
+        with col_comp:
+            st.markdown("#### ⏱️ Ausencias en curso")
+            if not comp_en_curso.empty:
+                st.dataframe(comp_en_curso, hide_index=True, width='stretch')
+            else:
+                st.info("No hay ausencias en curso")
+        st.markdown("---")
+
     # Obtener el clima actual
     weather = get_weather()
     pronostico = obtener_pronostico_extendido()
