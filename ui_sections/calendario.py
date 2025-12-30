@@ -113,7 +113,20 @@ def get_google_calendar_events(ical_url, days_ahead=365):
         return []
 
 def seccion_calendario(client):
-    st.subheader("🗓️ Calendario Unificado")
+    col1, col2 = st.columns([0.75, 0.25])
+    with col1:
+        st.subheader("🗓️ Calendario Unificado")
+    
+    # Botón para sincronizar manualmente todos los datos
+    if col2.button("🔄 Sincronizar Todo", use_container_width=True, help="Recarga datos de Google Sheets y Google Calendar"):
+        from google_sheets_client import refresh_all_data
+        with st.spinner('Sincronizando con Google Sheets...'):
+            refresh_all_data(client)
+            # Limpiar caché de eventos de Google para forzar recarga
+            if "google_events_cache" in st.session_state:
+                del st.session_state.google_events_cache
+        st.toast("¡Datos sincronizados!")
+        st.rerun()
 
     if "calendar_events" not in st.session_state:
         st.session_state.calendar_events = []
@@ -121,13 +134,17 @@ def seccion_calendario(client):
     # Obtener la URL del calendario de Google desde secrets.toml
     GOOGLE_CALENDAR_URL = st.secrets.get("google_calendar", {}).get("url")
     
-    # Obtener eventos del calendario de Google si la URL está configurada
-    google_events = []
-    if GOOGLE_CALENDAR_URL:
-        with st.spinner('Cargando eventos del calendario...'):
-            google_events = get_google_calendar_events(GOOGLE_CALENDAR_URL)
-    else:
-        st.warning("No se ha configurado la URL del calendario de Google en secrets.toml")
+    # Obtener eventos del calendario de Google (usando caché en session_state para no realentizar la navegación interna)
+    if "google_events_cache" not in st.session_state:
+        if GOOGLE_CALENDAR_URL:
+            with st.spinner('Cargando eventos de Google Calendar...'):
+                st.session_state.google_events_cache = get_google_calendar_events(GOOGLE_CALENDAR_URL)
+        else:
+            st.session_state.google_events_cache = []
+            if not GOOGLE_CALENDAR_URL:
+                st.warning("No se ha configurado la URL del calendario de Google en secrets.toml")
+    
+    google_events = st.session_state.google_events_cache
 
     def update_calendar_events():
         events = []
@@ -247,9 +264,10 @@ def seccion_calendario(client):
 
         st.session_state.calendar_events = events
 
-    if "last_section" not in st.session_state or st.session_state.last_section != "Calendario":
-        update_calendar_events()
-        st.session_state.last_section = "Calendario"
+    # Siempre actualizamos los eventos al cargar esta sección para asegurar que se vean los cambios
+    # hechos en otras secciones (como nuevas ausencias, licencias o tareas).
+    # Al usar caché para los eventos de Google Calendar, este proceso es instantáneo.
+    update_calendar_events()
 
     calendar_options = {
         "headerToolbar": {

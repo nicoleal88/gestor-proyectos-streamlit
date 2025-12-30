@@ -168,6 +168,8 @@ def main():
             selected_page = st.navigation(pages)
 
         # Área principal: Ejecutar la página seleccionada
+        # Guardar la sección actual para que las páginas puedan detectar cambios de sección
+        st.session_state.current_section = selected_page.title
         selected_page.run()
     else:
         st.error("No hay páginas disponibles para tu rol. Contacta al administrador.")

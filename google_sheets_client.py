@@ -59,6 +59,13 @@ def refresh_data(client, sheet_name):
     st.session_state[f"df_{sheet_name.lower()}"] = get_sheet_data(client, sheet_name)
     st.cache_data.clear()
 
+def refresh_all_data(client):
+    """Refresca todos los DataFrames del estado de la sesión."""
+    sheets = ["Tareas", "Vacaciones", "Compensados", "Notas", "Recordatorios", "Personal", "Eventos", "Vehiculos", "Viajes", "ViajesUpdates", "Destinos"]
+    for sheet_name in sheets:
+        st.session_state[f"df_{sheet_name.lower()}"] = get_sheet_data(client, sheet_name)
+    st.cache_data.clear()
+
 def update_cell_by_id(client, sheet_name, id_to_find, column_name, new_value):
     """Actualiza una celda específica buscando por ID y nombre de columna."""
     sheet = get_sheet(client, sheet_name)
