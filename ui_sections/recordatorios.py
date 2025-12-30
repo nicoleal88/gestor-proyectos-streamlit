@@ -22,11 +22,18 @@ def seccion_recordatorios(client, personal_list):
     vista_general, agregar_eliminar = st.tabs(["📊 Vista General", "➕ Agregar / 🗑️ Eliminar"])
 
     with vista_general:
-        st.dataframe(df_recordatorios, hide_index=True, width='content')
+        st.dataframe(
+            df_recordatorios, 
+            hide_index=True, 
+            width='content',
+            column_config={
+                "Fecha": st.column_config.DateColumn(format="DD/MM/YYYY")
+            }
+        )
 
     with agregar_eliminar:
         with st.form("recordatorios_form", clear_on_submit=True):
-            fecha = st.date_input("Fecha del recordatorio")
+            fecha = st.date_input("Fecha del recordatorio", format="DD/MM/YYYY")
             mensaje = st.text_area("Mensaje")
             responsable = st.selectbox("Responsable", options=["Seleccione persona..."] + personal_list)
 
@@ -42,7 +49,15 @@ def seccion_recordatorios(client, personal_list):
         if not df_recordatorios.empty:
             st.markdown("#### Eliminar un recordatorio")
             df_recordatorios['row_number'] = range(2, len(df_recordatorios) + 2)
-            options = [f"Fila {row['row_number']}: {row['Mensaje']} ({row['Fecha']})" for _, row in df_recordatorios.iterrows()]
+            # Formatear fecha para el selector
+            def format_row_display(row):
+                try:
+                    f = pd.to_datetime(row['Fecha']).strftime('%d/%m/%Y')
+                except:
+                    f = row['Fecha']
+                return f"Fila {row['row_number']}: {row['Mensaje']} ({f})"
+
+            options = [format_row_display(row) for _, row in df_recordatorios.iterrows()]
             row_to_delete_display = st.selectbox("Selecciona un recordatorio para eliminar", options=[""] + options)
 
             if st.button("Eliminar Recordatorio Seleccionado"):

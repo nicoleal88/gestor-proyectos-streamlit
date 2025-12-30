@@ -67,18 +67,18 @@ def mostrar_seccion_eventos(client):
 
         with st.form("eventos_form", clear_on_submit=True):
             nombre_evento = st.text_input("Nombre del Evento")
-            fecha_solicitud = st.date_input("Fecha Solicitud", value=datetime.now())
+            fecha_solicitud = st.date_input("Fecha Solicitud", value=datetime.now(), format="DD/MM/YYYY")
             tipo = st.selectbox("Tipo", options=["Evento"])
             
             if st.session_state.tipo_evento_radio == "Día completo":
                 col1, col2 = st.columns(2)
-                desde_fecha = col1.date_input("Desde fecha")
-                hasta_fecha = col2.date_input("Hasta fecha")
+                desde_fecha = col1.date_input("Desde fecha", format="DD/MM/YYYY")
+                hasta_fecha = col2.date_input("Hasta fecha", format="DD/MM/YYYY")
                 desde_hora = None
                 hasta_hora = None
             else: # Por horas
                 col1, col2, col3 = st.columns(3)
-                fecha = col1.date_input("Fecha")
+                fecha = col1.date_input("Fecha", format="DD/MM/YYYY")
                 desde_hora = col2.time_input("Desde hora")
                 hasta_hora = col3.time_input("Hasta hora")
                 desde_fecha = fecha
@@ -113,18 +113,18 @@ def mostrar_seccion_eventos(client):
 
                 with st.form(f"edit_eventos_form_{row_number_to_edit}"):
                     nombre_evento = st.text_input("Nombre del Evento", value=record_data["Nombre del Evento"])
-                    fecha_solicitud = st.date_input("Fecha Solicitud", value=pd.to_datetime(record_data["Fecha Solicitud"]))
+                    fecha_solicitud = st.date_input("Fecha Solicitud", value=pd.to_datetime(record_data["Fecha Solicitud"]), format="DD/MM/YYYY")
                     tipo = st.selectbox("Tipo", options=["Evento"], index=0)
 
                     if st.session_state[tipo_evento_key] == "Día completo":
                         col1, col2 = st.columns(2)
-                        desde_fecha = col1.date_input("Desde fecha", value=pd.to_datetime(record_data["Desde fecha"]))
-                        hasta_fecha = col2.date_input("Hasta fecha", value=pd.to_datetime(record_data["Hasta fecha"]))
+                        desde_fecha = col1.date_input("Desde fecha", value=pd.to_datetime(record_data["Desde fecha"]), format="DD/MM/YYYY")
+                        hasta_fecha = col2.date_input("Hasta fecha", value=pd.to_datetime(record_data["Hasta fecha"]), format="DD/MM/YYYY")
                         desde_hora = None
                         hasta_hora = None
                     else: # Por horas
                         col1, col2, col3 = st.columns(3)
-                        fecha = col1.date_input("Fecha", value=pd.to_datetime(record_data["Desde fecha"]))
+                        fecha = col1.date_input("Fecha", value=pd.to_datetime(record_data["Desde fecha"]), format="DD/MM/YYYY")
                         desde_hora = col2.time_input("Desde hora", value=datetime.strptime(record_data["Desde hora"], '%H:%M').time() if not es_dia_completo and record_data["Desde hora"] and isinstance(record_data["Desde hora"], str) else None)
                         hasta_hora = col3.time_input("Hasta hora", value=datetime.strptime(record_data["Hasta hora"], '%H:%M').time() if not es_dia_completo and record_data["Hasta hora"] and isinstance(record_data["Hasta hora"], str) else None)
                         desde_fecha = fecha

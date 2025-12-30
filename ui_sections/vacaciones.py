@@ -111,10 +111,10 @@ def seccion_vacaciones(client, personal_list):
         )
 
     with agregar_vacaciones:
-        st.info("Complete las fechas para ver la duración del período.")
+        # st.info("Complete las fechas para ver la duración del período.")
         col1, col2 = st.columns(2)
-        fecha_inicio_live = col1.date_input("Fecha inicio", key="vac_fecha_inicio", value=datetime.now().date())
-        fecha_regreso_live = col2.date_input("Fecha regreso al trabajo", key="vac_fecha_regreso", value=datetime.now().date() + pd.Timedelta(days=1))
+        fecha_inicio_live = col1.date_input("Fecha inicio", key="vac_fecha_inicio", value=datetime.now().date(), format="DD/MM/YYYY")
+        fecha_regreso_live = col2.date_input("Fecha regreso al trabajo", key="vac_fecha_regreso", value=datetime.now().date() + pd.Timedelta(days=1), format="DD/MM/YYYY")
 
         # Cálculo en vivo de días con API de feriados
         if fecha_regreso_live <= fecha_inicio_live:
@@ -129,7 +129,7 @@ def seccion_vacaciones(client, personal_list):
 
         with st.form("vacaciones_form", clear_on_submit=True):
             nombre = st.selectbox("Apellido, Nombres", options=["Seleccione persona..."] + personal_list)
-            fecha_solicitud = st.date_input("Fecha Solicitud", value=datetime.now())
+            fecha_solicitud = st.date_input("Fecha Solicitud", value=datetime.now(), format="DD/MM/YYYY")
             tipo = st.selectbox("Tipo", options=["Licencia Ordinaria 2024", "Licencia Ordinaria 2025", "Otros"])
             observaciones = st.text_area("Observaciones", placeholder="Detalles adicionales...")
 
@@ -166,8 +166,8 @@ def seccion_vacaciones(client, personal_list):
                 # Entradas en vivo para la edición
                 st.markdown("---")
                 col1, col2 = st.columns(2)
-                edit_inicio = col1.date_input("Modificar inicio", value=pd.to_datetime(record_data["Fecha inicio"]), key=f"edit_vac_ini_{row_number_to_edit}")
-                edit_regreso = col2.date_input("Modificar regreso", value=pd.to_datetime(record_data["Fecha regreso"]), key=f"edit_vac_reg_{row_number_to_edit}")
+                edit_inicio = col1.date_input("Modificar inicio", value=pd.to_datetime(record_data["Fecha inicio"]), key=f"edit_vac_ini_{row_number_to_edit}", format="DD/MM/YYYY")
+                edit_regreso = col2.date_input("Modificar regreso", value=pd.to_datetime(record_data["Fecha regreso"]), key=f"edit_vac_reg_{row_number_to_edit}", format="DD/MM/YYYY")
 
                 if edit_regreso > edit_inicio:
                     ultimo_dia_edit = edit_regreso - pd.Timedelta(days=1)
@@ -178,7 +178,7 @@ def seccion_vacaciones(client, personal_list):
 
                 with st.form(f"edit_vac_form_{row_number_to_edit}"):
                     nombre = st.selectbox("Apellido, Nombres", options=["Seleccione persona..."] + personal_list, index=personal_list.index(record_data["Apellido, Nombres"]) + 1 if record_data["Apellido, Nombres"] in personal_list else 0)
-                    fecha_solicitud = st.date_input("Fecha Solicitud", value=pd.to_datetime(record_data["Fecha solicitud"]))
+                    fecha_solicitud = st.date_input("Fecha Solicitud", value=pd.to_datetime(record_data["Fecha solicitud"]), format="DD/MM/YYYY")
                     tipo = st.selectbox("Tipo", options=["Licencia Ordinaria 2024", "Licencia Ordinaria 2025", "Otros"], index=["Licencia Ordinaria 2024", "Licencia Ordinaria 2025", "Otros"].index(record_data["Tipo"]) if record_data["Tipo"] in ["Licencia Ordinaria 2024", "Licencia Ordinaria 2025", "Otros"] else 0)
                     observaciones = st.text_area("Observaciones", value=record_data["Observaciones"])
 

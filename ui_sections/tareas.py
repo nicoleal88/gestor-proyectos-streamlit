@@ -204,7 +204,7 @@ def seccion_tareas(client, personal_list):
             titulo_tarea = st.text_input("Título Tarea")
             tarea = st.text_area("Descripción Completa de la Tarea")
             responsable = st.selectbox("Responsable", options=["Seleccione persona..."] + personal_list)
-            fecha_limite = st.date_input("Fecha límite", value=None)
+            fecha_limite = st.date_input("Fecha límite", value=None, format="DD/MM/YYYY")
             estado = st.selectbox("Estado", ["Pendiente", "En curso", "Finalizada"])
 
             if st.form_submit_button("Agregar Tarea"):
@@ -241,12 +241,19 @@ def seccion_tareas(client, personal_list):
 
                 st.markdown("#### Historial de Avances")
                 if not comments_df.empty:
-                    st.dataframe(comments_df, width='stretch', hide_index=True)
+                    st.dataframe(
+                        comments_df, 
+                        width='stretch', 
+                        hide_index=True,
+                        column_config={
+                            "Fecha": st.column_config.DateColumn(format="DD/MM/YYYY")
+                        }
+                    )
                 else:
                     st.info("No hay comentarios.")
 
                 with st.form(f"comment_form_{id_to_show}", clear_on_submit=True):
-                    comment_date = st.date_input("Fecha del comentario", value=datetime.now())
+                    comment_date = st.date_input("Fecha del comentario", value=datetime.now(), format="DD/MM/YYYY")
                     new_comment = st.text_area("Añadir nuevo comentario")
                     if st.form_submit_button("Guardar Comentario"):
                         if new_comment:
@@ -261,7 +268,7 @@ def seccion_tareas(client, personal_list):
                         titulo_tarea = st.text_input("Título Tarea", value=task_data['Título Tarea'])
                         tarea = st.text_area("Descripción Completa", value=task_data['Tarea'])
                         responsable = st.selectbox("Responsable", options=["Seleccione persona..."] + personal_list, index=personal_list.index(task_data["Responsable"]) + 1 if task_data["Responsable"] in personal_list else 0)
-                        fecha_limite = st.date_input("Fecha límite", value=pd.to_datetime(task_data["Fecha límite"]))
+                        fecha_limite = st.date_input("Fecha límite", value=pd.to_datetime(task_data["Fecha límite"]), format="DD/MM/YYYY")
                         estado = st.selectbox("Estado", ["Pendiente", "En curso", "Finalizada"], index=["Pendiente", "En curso", "Finalizada"].index(task_data["Estado"]))
                         
                         col_mod, col_del = st.columns(2)

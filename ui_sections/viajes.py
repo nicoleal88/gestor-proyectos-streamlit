@@ -386,7 +386,7 @@ def _tab_registro_viaje(client, personal_list: List[str]):
     if "salida_hora" not in st.session_state:
         st.session_state["salida_hora"] = datetime.now().time()
 
-    salida_fecha = col3.date_input("Fecha de salida", value=st.session_state["salida_fecha"], key="salida_fecha")
+    salida_fecha = col3.date_input("Fecha de salida", value=st.session_state["salida_fecha"], key="salida_fecha", format="DD/MM/YYYY")
     salida_hora = col4.time_input("Hora de salida", value=st.session_state["salida_hora"], key="salida_hora")
 
     col5, col6 = st.columns(2)

@@ -68,7 +68,7 @@ def seccion_notas(client, personal_list):
                 hide_index=True,
                 column_order=column_order,
                 column_config={
-                    'Fecha': st.column_config.Column(disabled=True),
+                    'Fecha': st.column_config.DateColumn(format="DD/MM/YYYY", disabled=True),
                     'Remitente': st.column_config.Column(disabled=True),
                     'DNI': st.column_config.Column(disabled=True),
                     'Teléfono': st.column_config.Column(disabled=True),
@@ -107,7 +107,7 @@ def seccion_notas(client, personal_list):
 
     with nueva_nota:
         with st.form("nueva_nota_form", clear_on_submit=True):
-            fecha = st.date_input("Fecha", value=datetime.now())
+            fecha = st.date_input("Fecha", value=datetime.now(), format="DD/MM/YYYY")
             remitente = st.text_area("Remitente(s)")
             dni = st.text_input("DNI(s)")
             telefono = st.text_input("Teléfono(s)")
@@ -141,7 +141,7 @@ def seccion_notas(client, personal_list):
                         default_resp_idx = personal_options.index(record_data["Responsable"])
                     except (ValueError, KeyError):
                         default_resp_idx = 0
-                    fecha = st.date_input("Fecha", value=pd.to_datetime(record_data["Fecha"]))
+                    fecha = st.date_input("Fecha", value=pd.to_datetime(record_data["Fecha"]), format="DD/MM/YYYY")
                     remitente = st.text_area("Remitente(s)", value=record_data["Remitente"])
                     dni = st.text_input("DNI(s)", value=str(record_data.get("DNI", "")))
                     telefono = st.text_input("Teléfono(s)", value=str(record_data.get("Teléfono", "")))

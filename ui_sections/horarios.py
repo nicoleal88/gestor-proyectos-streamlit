@@ -435,7 +435,7 @@ def obtener_compensatorios_por_fecha():
                         'tipo': 'AUSENCIAS',
                         'tipo_detalle': detalle,
                         'duracion_horas': duracion,
-                        'fecha_formateada': pd.Timestamp(row['Desde fecha']).strftime('%a %d-%b-%Y'),
+                        'fecha_formateada': pd.Timestamp(row['Desde fecha']).strftime('%d/%m/%Y'),
                         'hora_inicio': hora_inicio.strftime('%H:%M'),
                         'hora_fin': hora_fin.strftime('%H:%M')
                     })
@@ -469,7 +469,7 @@ def obtener_compensatorios_por_fecha():
                         'tipo': 'AUSENCIAS',
                         'tipo_detalle': detalle,
                         'duracion_horas': 8.0,
-                        'fecha_formateada': f.strftime('%a %d-%b-%Y'),
+                        'fecha_formateada': f.strftime('%d/%m/%Y'),
                         'hora_inicio': '',
                         'hora_fin': ''
                     })
@@ -530,7 +530,7 @@ def obtener_vacaciones_por_fecha():
                         'tipo': 'VACACIONES',
                         'tipo_detalle': vac_detalle,
                         'duracion_horas': 8.0,
-                        'fecha_formateada': f.strftime('%a %d-%b-%Y'),
+                        'fecha_formateada': f.strftime('%d/%m/%Y'),
                         'hora_inicio': '',
                         'hora_fin': ''
                     })
@@ -1144,7 +1144,7 @@ def seccion_horarios(client, personal_list):
                 # Formatear la fecha para incluir el día de la semana en español
                 dias_semana = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
                 df_plot['fecha_formateada'] = df_plot['fecha_dt'].apply(
-                    lambda x: f"{dias_semana[x.weekday()]} {x.strftime('%d-%b-%Y')}"
+                    lambda x: f"{dias_semana[x.weekday()]} {x.strftime('%d/%m/%Y')}"
                 )
                 
                 # Obtener datos de ausencias y vacaciones y filtrar por mes/empleado

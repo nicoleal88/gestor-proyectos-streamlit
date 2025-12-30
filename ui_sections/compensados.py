@@ -108,8 +108,8 @@ def seccion_compensados(client, personal_list):
         # Entradas en vivo (fuera del form) para poder mostrar leyendas dinámicas
         if st.session_state.tipo_compensatorio_radio == "Día completo":
             col1, col2 = st.columns(2)
-            desde_fecha_live = col1.date_input("Desde fecha", key="comp_desde_fecha", value=datetime.now().date())
-            hasta_fecha_live = col2.date_input("Hasta fecha", key="comp_hasta_fecha", value=datetime.now().date())
+            desde_fecha_live = col1.date_input("Desde fecha", key="comp_desde_fecha", value=datetime.now().date(), format="DD/MM/YYYY")
+            hasta_fecha_live = col2.date_input("Hasta fecha", key="comp_hasta_fecha", value=datetime.now().date(), format="DD/MM/YYYY")
 
             # Cálculo en vivo de días con API de feriados (inclusive)
             if hasta_fecha_live < desde_fecha_live:
@@ -124,7 +124,7 @@ def seccion_compensados(client, personal_list):
             st.session_state.setdefault("comp_hasta_hora", None)
         else:  # Por horas
             col1, col2, col3 = st.columns(3)
-            fecha_live = col1.date_input("Fecha", key="comp_fecha", value=datetime.now().date())
+            fecha_live = col1.date_input("Fecha", key="comp_fecha", value=datetime.now().date(), format="DD/MM/YYYY")
             desde_hora_live = col2.time_input("Desde hora", key="comp_desde_hora")
             hasta_hora_live = col3.time_input("Hasta hora", key="comp_hasta_hora")
 
@@ -149,7 +149,7 @@ def seccion_compensados(client, personal_list):
 
         with st.form("compensados_form", clear_on_submit=True):
             nombre = st.selectbox("Apellido, Nombres", options=["Seleccione persona..."] + personal_list)
-            fecha_solicitud = st.date_input("Fecha Solicitud", value=datetime.now())
+            fecha_solicitud = st.date_input("Fecha Solicitud", value=datetime.now(), format="DD/MM/YYYY")
             tipo = st.selectbox("Tipo", options=["Compensatorio", "Certificado médico", "Permiso gremial", "Estudios", "Otro"])
 
             # Tomamos los valores seteados fuera del form
@@ -222,13 +222,13 @@ def seccion_compensados(client, personal_list):
 
                 with st.form(f"edit_compensados_form_{row_number_to_edit}"):
                     nombre = st.selectbox("Apellido, Nombres", options=["Seleccione persona..."] + personal_list, index=personal_list.index(record_data["Apellido, Nombres"]) + 1 if record_data["Apellido, Nombres"] in personal_list else 0)
-                    fecha_solicitud = st.date_input("Fecha Solicitud", value=pd.to_datetime(record_data["Fecha Solicitud"]))
+                    fecha_solicitud = st.date_input("Fecha Solicitud", value=pd.to_datetime(record_data["Fecha Solicitud"]), format="DD/MM/YYYY")
                     tipo = st.selectbox("Tipo", options=["Compensatorio"], index=0)
 
                     if st.session_state[tipo_compensatorio_key] == "Día completo":
                         col1, col2 = st.columns(2)
-                        desde_fecha = col1.date_input("Desde fecha", value=pd.to_datetime(record_data["Desde fecha"]))
-                        hasta_fecha = col2.date_input("Hasta fecha", value=pd.to_datetime(record_data["Hasta fecha"]))
+                        desde_fecha = col1.date_input("Desde fecha", value=pd.to_datetime(record_data["Desde fecha"]), format="DD/MM/YYYY")
+                        hasta_fecha = col2.date_input("Hasta fecha", value=pd.to_datetime(record_data["Hasta fecha"]), format="DD/MM/YYYY")
                         
                         if hasta_fecha >= desde_fecha:
                             msg_edit, d_c_edit, d_h_edit = format_duracion_licencia(desde_fecha, hasta_fecha)
@@ -240,7 +240,7 @@ def seccion_compensados(client, personal_list):
                         hasta_hora = None
                     else: # Por horas
                         col1, col2, col3 = st.columns(3)
-                        fecha = col1.date_input("Fecha", value=pd.to_datetime(record_data["Desde fecha"]))
+                        fecha = col1.date_input("Fecha", value=pd.to_datetime(record_data["Desde fecha"]), format="DD/MM/YYYY")
                         desde_hora = col2.time_input("Desde hora", value=datetime.strptime(record_data["Desde hora"], '%H:%M').time() if not es_dia_completo and record_data["Desde hora"] and isinstance(record_data["Desde hora"], str) else None)
                         hasta_hora = col3.time_input("Hasta hora", value=datetime.strptime(record_data["Hasta hora"], '%H:%M').time() if not es_dia_completo and record_data["Hasta hora"] and isinstance(record_data["Hasta hora"], str) else None)
                         desde_fecha = fecha
