@@ -576,7 +576,15 @@ ID_NOMBRE_MAP = {
     '10000': 'Velázquez, Jesica Lorena',
     '22': 'Vidal, Raúl Eduardo',
     '8': 'Villalovos, Fabián Darío',
-    '87': 'Villar, Sebastián'
+    '87': 'Villar, Sebastián',
+    'GOBBI': 'Gobbi, Fabián Jesús',
+    'GONGORA': 'Gongora, Juan Pablo',
+    'RODRIGUEZ, JORGE': 'Rodriguez, Jorge',
+    'VITALE': 'Vitale, Primo',
+    'SATO': 'Sato, Ricardo',
+    'CERDA': 'Cerda, Marcos',
+    'LEAL': 'Leal, Nicolás',
+    'RIOS': 'Rios, Gustavo'
 }
 
 MAPA_PLANILLA_ID = {
@@ -675,12 +683,17 @@ def seccion_horarios(client, personal_list):
     
     # Obtener lista de archivos del Drive
     st.session_state['drive_csv_files'] = list_csvs_in_folder(DEFAULT_FOLDER_ID)
-    files_list = st.session_state.get('drive_csv_files', [])
+    files_list_all = st.session_state.get('drive_csv_files', [])
     
-    if not files_list:
+    # Ordenar por nombre descendente (YYYY-MM) para asegurar los periodos más recientes cronológicamente
+    files_list_all.sort(key=lambda x: x.get('name', ''), reverse=True)
+    
+    files_list = files_list_all[:6]  # Tomar solo los 6 más recientes por nombre de archivo
+    
+    if not files_list_all:
         st.warning("No se encontraron archivos en la carpeta de Google Drive.")
         return
-        
+    
     # Extraer período (YYYY-MM) del nombre del archivo
     def extract_period(filename):
         """Extrae el período YYYY-MM del nombre del archivo si existe."""
@@ -688,16 +701,55 @@ def seccion_horarios(client, personal_list):
         match = re.search(r'(\d{4}-\d{2})', filename)
         return match.group(1) if match else filename.rsplit('.', 1)[0] if '.' in filename else filename
 
-    # Cargar automáticamente todos los archivos
-    file_ids = [f["id"] for f in files_list]
-    display_names = [extract_period(f["name"]) for f in files_list]
+    # Mapeo de periodos a IDs de archivos
+    period_to_id = {extract_period(f["name"]): f["id"] for f in files_list_all}
+    available_periods = sorted(period_to_id.keys(), reverse=True)
     
-    # Mostrar mensaje con los meses cargados
-    if display_names:
-        st.success(f"Se cargaron automáticamente {len(display_names)} períodos: {', '.join(sorted(display_names))}")
+    # Periodos seleccionados por defecto (los 6 más recientes)
+    default_periods = available_periods[:6]
     
-    # Establecer los IDs para cargar
-    st.session_state['drive_to_load_ids'] = file_ids
+    # Multiselector para elegir periodos
+    selected_periods = st.multiselect(
+        "Selecciona los periodos a analizar:",
+        options=available_periods,
+        default=st.session_state.get('last_selected_periods', default_periods),
+        help="Los archivos seleccionados se descargarán y procesarán para el análisis."
+    )
+    
+    # Guardar selección actual
+    st.session_state['last_selected_periods'] = selected_periods
+    
+    # Obtener IDs de los periodos seleccionados (asegurando que sea una lista)
+    file_ids_to_load = [period_to_id[p] for p in (selected_periods or []) if p in period_to_id]
+    
+    # Verificar si necesitamos cargar datos (asegurando que sea una lista)
+    raw_processed_ids = st.session_state.get('drive_processed_ids')
+    processed_ids = list(raw_processed_ids) if isinstance(raw_processed_ids, (list, tuple, set)) else []
+    
+    # Comparar selecciones
+    needs_reload = sorted(file_ids_to_load) != sorted(processed_ids)
+    
+    if needs_reload:
+        if st.button("🚀 Procesar periodos seleccionados", type="primary"):
+            st.session_state['drive_to_load_ids'] = file_ids_to_load
+            # Limpiar datos previos para forzar recarga en el siguiente bloque
+            st.session_state['df_registros_horarios'] = None
+            st.session_state['drive_processed_ids'] = None
+            st.rerun()
+        
+        # Si NO hay una carga en progreso (drive_to_load_ids vacío o ya procesado)
+        # y no hay datos cargados, entonces pedimos al usuario que inicie la carga.
+        if not st.session_state.get('drive_to_load_ids') or st.session_state.get('drive_processed_ids') is not None:
+            if not processed_ids:
+                st.info("Selecciona los meses que deseas analizar y haz clic en 'Procesar periodos seleccionados'.")
+                return
+            else:
+                st.warning("La selección ha cambiado. Haz clic en el botón para actualizar los datos con los nuevos meses.")
+
+    # Mostrar mensaje con los meses actualmente cargados
+    if processed_ids:
+        loaded_periods = [p for p, fid in period_to_id.items() if fid in processed_ids]
+        st.success(f"Datos cargados para {len(loaded_periods)} períodos: {', '.join(sorted(loaded_periods))}")
     
     # Traer datos previos si existen
     df_registros = st.session_state.get('df_registros_horarios')
@@ -1192,15 +1244,39 @@ def seccion_horarios(client, personal_list):
                 
                 # Asegurarse de que tenemos datos para todos los tipos (LIBRO, RELOJ y COMPENSATORIO) para cada fecha
                 from itertools import product
-                fechas_unicas = df_plot['fecha'].unique()
+                # Generar rango completo de fechas para mostrar días sin datos (fines de semana, etc.)
+                if mes_seleccionado != 'Todos':
+                    try:
+                        mes_dt = pd.to_datetime(mes_seleccionado)
+                        start_date = mes_dt.replace(day=1).date()
+                        # Obtener el último día del mes
+                        if hasattr(mes_dt, 'days_in_month'):
+                            end_date = mes_dt.replace(day=mes_dt.days_in_month).date()
+                        else:
+                            import calendar
+                            last_day = calendar.monthrange(mes_dt.year, mes_dt.month)[1]
+                            end_date = mes_dt.replace(day=last_day).date()
+                        fechas_unicas = pd.date_range(start=start_date, end=end_date).date
+                    except Exception:
+                        fechas_unicas = df_plot['fecha'].unique() if not df_plot.empty else []
+                elif not df_plot.empty or not df_compensatorios.empty or (df_vacaciones_plot is not None and not df_vacaciones_plot.empty):
+                    all_fechas = []
+                    if not df_plot.empty: all_fechas.extend(df_plot['fecha'].tolist())
+                    if not df_compensatorios.empty: all_fechas.extend(df_compensatorios['fecha'].tolist())
+                    if df_vacaciones_plot is not None and not df_vacaciones_plot.empty:
+                        all_fechas.extend(df_vacaciones_plot['fecha'].tolist())
+                    
+                    if all_fechas:
+                        min_date = min(all_fechas)
+                        max_date = max(all_fechas)
+                        fechas_unicas = pd.date_range(start=min_date, end=max_date).date
+                    else:
+                        fechas_unicas = []
+                else:
+                    fechas_unicas = df_plot['fecha'].unique() if not df_plot.empty else []
                 
-                # Si hay ausencias/vacaciones, añadir sus fechas únicas
-                if not df_compensatorios.empty:
-                    fechas_compensatorios = df_compensatorios['fecha'].unique()
-                    fechas_unicas = pd.unique(list(fechas_unicas) + list(fechas_compensatorios))
-                if df_vacaciones_plot is not None and not df_vacaciones_plot.empty:
-                    fechas_vac = df_vacaciones_plot['fecha'].unique()
-                    fechas_unicas = pd.unique(list(fechas_unicas) + list(fechas_vac))
+                # Asegurar que sean fechas únicas y ordenadas
+                fechas_unicas = sorted(list(set(fechas_unicas)))
                 
                 # Definir los tipos de registro
                 tipos = ['LIBRO', 'RELOJ']
@@ -1290,8 +1366,14 @@ def seccion_horarios(client, personal_list):
                 else:
                     df_completo['es_salida_campo'] = False
                 
-                # Crear una copia del DataFrame para no modificar el original
                 df_plot = df_completo.copy()
+                # Asegurar que todas las filas tengan datos de fecha procesados para el gráfico (incluyendo días vacíos)
+                df_plot['fecha_dt'] = pd.to_datetime(df_plot['fecha'])
+                dias_semana = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
+                df_plot['fecha_formateada'] = df_plot['fecha_dt'].apply(
+                    lambda x: f"{dias_semana[x.weekday()]} {x.strftime('%d/%m/%Y')}"
+                )
+                
                 # Asegurar columna para detalles de ausencias
                 if 'tipo_detalle' not in df_plot.columns:
                     df_plot['tipo_detalle'] = ''
@@ -1675,76 +1757,75 @@ def seccion_horarios(client, personal_list):
                         with col4:
                             st.metric("Días con registros impares", f"{dias_con_impares} de {total_dias}", 
                                    delta=None, delta_color="inverse" if dias_con_impares > 0 else "normal")
+                # --- Boxplots de distribución por tipo de registro ---
+                st.subheader("Distribución de horas por tipo de registro")
+                
+                # Crear dos columnas para los boxplots
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    # Boxplot para LIBRO - excluyendo días con 0 horas
+                    df_libro = df_completo[(df_completo['tipo_combinado'] == 'LIBRO') & 
+                                         (df_completo['duracion_horas'] > 0)]
+                    if not df_libro.empty:
+                        fig_box_libro = px.box(
+                            df_libro,
+                            y='duracion_horas',
+                            title='Distribución de horas - LIBRO',
+                            labels={'duracion_horas': 'Horas trabajadas'},
+                            color_discrete_sequence=['#1f77b4'],
+                            template='plotly_white'
+                        )
+                        fig_box_libro.update_layout(
+                            showlegend=False,
+                            yaxis_title='Horas',
+                            height=400,
+                            margin=dict(l=20, r=20, t=40, b=20)
+                        )
+                        # Añadir línea en 8 horas
+                        fig_box_libro.add_hline(
+                            y=8,
+                            line_dash="dash",
+                            line_color="red",
+                            annotation_text="8 hs ideales",
+                            annotation_position="top right"
+                        )
+                        st.plotly_chart(fig_box_libro, use_container_width=True)
+                    else:
+                        st.warning("No hay datos de LIBRO para mostrar")
+                
+                with col2:
+                    # Boxplot para RELOJ (excluyendo horas trabajadas = 0)
+                    df_reloj = df_completo[(df_completo['tipo_combinado'] == 'RELOJ') & 
+                                         (df_completo['duracion_horas'] > 0)]
+                    if not df_reloj.empty:
+                        fig_box_reloj = px.box(
+                            df_reloj,
+                            y='duracion_horas',
+                            title='Distribución de horas - RELOJ',
+                            labels={'duracion_horas': 'Horas trabajadas'},
+                            color_discrete_sequence=['#ff7f0e'],
+                            template='plotly_white'
+                        )
+                        fig_box_reloj.update_layout(
+                            showlegend=False,
+                            yaxis_title='Horas',
+                            height=400,
+                            margin=dict(l=20, r=20, t=40, b=20)
+                        )
+                        # Añadir línea en 8 horas
+                        fig_box_reloj.add_hline(
+                            y=8,
+                            line_dash="dash",
+                            line_color="red",
+                            annotation_text="8 hs ideales",
+                            annotation_position="top right"
+                        )
+                        st.plotly_chart(fig_box_reloj, use_container_width=True)
+                    else:
+                        st.warning("No hay datos de RELOJ para mostrar")
             else:
                 st.info("No hay datos para mostrar en el historial de jornadas para este filtro.")
-            
-            # --- Boxplots de distribución por tipo de registro ---
-            st.subheader("Distribución de horas por tipo de registro")
-            
-            # Crear dos columnas para los boxplots
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                # Boxplot para LIBRO - excluyendo días con 0 horas
-                df_libro = df_completo[(df_completo['tipo_combinado'] == 'LIBRO') & 
-                                     (df_completo['duracion_horas'] > 0)]
-                if not df_libro.empty:
-                    fig_box_libro = px.box(
-                        df_libro,
-                        y='duracion_horas',
-                        title='Distribución de horas - LIBRO',
-                        labels={'duracion_horas': 'Horas trabajadas'},
-                        color_discrete_sequence=['#1f77b4'],
-                        template='plotly_white'
-                    )
-                    fig_box_libro.update_layout(
-                        showlegend=False,
-                        yaxis_title='Horas',
-                        height=400,
-                        margin=dict(l=20, r=20, t=40, b=20)
-                    )
-                    # Añadir línea en 8 horas
-                    fig_box_libro.add_hline(
-                        y=8,
-                        line_dash="dash",
-                        line_color="red",
-                        annotation_text="8 hs ideales",
-                        annotation_position="top right"
-                    )
-                    st.plotly_chart(fig_box_libro, use_container_width=True)
-                else:
-                    st.warning("No hay datos de LIBRO para mostrar")
-            
-            with col2:
-                # Boxplot para RELOJ (excluyendo horas trabajadas = 0)
-                df_reloj = df_completo[(df_completo['tipo_combinado'] == 'RELOJ') & 
-                                     (df_completo['duracion_horas'] > 0)]
-                if not df_reloj.empty:
-                    fig_box_reloj = px.box(
-                        df_reloj,
-                        y='duracion_horas',
-                        title='Distribución de horas - RELOJ',
-                        labels={'duracion_horas': 'Horas trabajadas'},
-                        color_discrete_sequence=['#ff7f0e'],
-                        template='plotly_white'
-                    )
-                    fig_box_reloj.update_layout(
-                        showlegend=False,
-                        yaxis_title='Horas',
-                        height=400,
-                        margin=dict(l=20, r=20, t=40, b=20)
-                    )
-                    # Añadir línea en 8 horas
-                    fig_box_reloj.add_hline(
-                        y=8,
-                        line_dash="dash",
-                        line_color="red",
-                        annotation_text="8 hs ideales",
-                        annotation_position="top right"
-                    )
-                    st.plotly_chart(fig_box_reloj, use_container_width=True)
-                else:
-                    st.warning("No hay datos de RELOJ para mostrar")
 
             st.subheader("Jornadas del empleado seleccionado")
             
