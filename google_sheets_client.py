@@ -35,7 +35,7 @@ def get_sheet(client, sheet_name):
 # --- FUNCIONES DE DATOS ---
 def init_session_state(client):
     """Inicializa el estado de la sesión para cada hoja de cálculo."""
-    sheets = ["Tareas", "Vacaciones", "Compensados", "Notas", "Recordatorios", "Personal", "Eventos", "Vehiculos", "Viajes", "ViajesUpdates", "Destinos", "Feriados_Manuales"]
+    sheets = ["Tareas", "Vacaciones", "Compensados", "Notas", "Personal", "Eventos", "Vehiculos", "Viajes", "ViajesUpdates", "Destinos", "Feriados_Manuales"]
     for sheet_name in sheets:
         if f"df_{sheet_name.lower()}" not in st.session_state:
             # Para Feriados_Manuales, si no existe no mostramos error crítico
@@ -88,7 +88,7 @@ def refresh_data(client, sheet_name):
 
 def refresh_all_data(client):
     """Refresca todos los DataFrames del estado de la sesión."""
-    sheets = ["Tareas", "Vacaciones", "Compensados", "Notas", "Recordatorios", "Personal", "Eventos", "Vehiculos", "Viajes", "ViajesUpdates", "Destinos", "Feriados_Manuales"]
+    sheets = ["Tareas", "Vacaciones", "Compensados", "Notas", "Personal", "Eventos", "Vehiculos", "Viajes", "ViajesUpdates", "Destinos", "Feriados_Manuales"]
     for sheet_name in sheets:
         if sheet_name == "Feriados_Manuales":
             st.session_state[f"df_{sheet_name.lower()}"] = get_sheet_data_silent(client, sheet_name)

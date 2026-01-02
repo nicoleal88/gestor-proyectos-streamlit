@@ -7,7 +7,7 @@ from version_manager import display_simple_version_sidebar
 
 # Mapeo de roles a permisos
 ROLES_PERMISOS = {
-    'admin': ['inicio', 'tareas', 'vacaciones', 'compensados', 'eventos', 'notas', 'recordatorios', 'calendario', 'horarios', 'utilidades'],
+    'admin': ['inicio', 'tareas', 'vacaciones', 'compensados', 'eventos', 'notas', 'calendario', 'horarios', 'utilidades'],
     'empleado': ['inicio', 'tareas', 'vacaciones'],
     'secretaria': ['inicio', 'vacaciones', 'compensados', 'horarios'],
     'invitado': ['inicio']
@@ -20,7 +20,6 @@ PAGE_PERMISSIONS = {
     '02_Vacaciones': 'vacaciones',
     '03_Compensados': 'compensados',
     '04_Notas': 'notas',
-    '05_Recordatorios': 'recordatorios',
     '06_Calendario': 'calendario',
     '07_Horarios': 'horarios',
     '08_Viajes': 'horarios',
@@ -34,7 +33,6 @@ PAGE_ICONS = {
     '02_Vacaciones': '📅',
     '03_Compensados': '⏱️',
     '04_Notas': '📝',
-    '05_Recordatorios': '🔔',
     '06_Calendario': '📆',
     '07_Horarios': '👥',
     '08_Viajes': '🚗',

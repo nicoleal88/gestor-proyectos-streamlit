@@ -240,12 +240,6 @@ def seccion_calendario(client):
                         "end": end_dt, 
                         "color": "#DDA0DD"
                     })
-        df_reminders = st.session_state.get("df_recordatorios", pd.DataFrame())
-        if not df_reminders.empty:
-            df_reminders['Fecha'] = pd.to_datetime(df_reminders['Fecha'], errors='coerce')
-            for _, row in df_reminders.iterrows():
-                if pd.notna(row['Fecha']):
-                    events.append({"title": f"Recordatorio: {row['Mensaje']}", "start": row['Fecha'].strftime('%Y-%m-%d'), "color": "#8A2BE2"})
 
         # Añadir eventos de Google Calendar
         events.extend(google_events)
