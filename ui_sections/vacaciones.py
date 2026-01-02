@@ -130,8 +130,8 @@ def seccion_vacaciones(client, personal_list):
         with st.form("vacaciones_form", clear_on_submit=True):
             nombre = st.selectbox("Apellido, Nombres", options=["Seleccione persona..."] + personal_list)
             fecha_solicitud = st.date_input("Fecha Solicitud", value=datetime.now(), format="DD/MM/YYYY")
-            tipo = st.selectbox("Tipo", options=["Licencia Ordinaria 2024", "Licencia Ordinaria 2025", "Otros"])
-            observaciones = st.text_area("Observaciones", placeholder="Detalles adicionales...")
+            tipo = st.selectbox("Tipo", options=["Licencia Ordinaria 2025", "Otros"])
+            observaciones = st.text_area("Observaciones", value="Pendientes: ", placeholder="Detalles adicionales...")
 
             if st.form_submit_button("Agregar Registro"):
                 if nombre == "Seleccione persona...":
@@ -179,8 +179,8 @@ def seccion_vacaciones(client, personal_list):
                 with st.form(f"edit_vac_form_{row_number_to_edit}"):
                     nombre = st.selectbox("Apellido, Nombres", options=["Seleccione persona..."] + personal_list, index=personal_list.index(record_data["Apellido, Nombres"]) + 1 if record_data["Apellido, Nombres"] in personal_list else 0)
                     fecha_solicitud = st.date_input("Fecha Solicitud", value=pd.to_datetime(record_data["Fecha solicitud"]), format="DD/MM/YYYY")
-                    tipo = st.selectbox("Tipo", options=["Licencia Ordinaria 2024", "Licencia Ordinaria 2025", "Otros"], index=["Licencia Ordinaria 2024", "Licencia Ordinaria 2025", "Otros"].index(record_data["Tipo"]) if record_data["Tipo"] in ["Licencia Ordinaria 2024", "Licencia Ordinaria 2025", "Otros"] else 0)
-                    observaciones = st.text_area("Observaciones", value=record_data["Observaciones"])
+                    tipo = st.selectbox("Tipo", options=["Licencia Ordinaria 2025", "Otros"], index=["Licencia Ordinaria 2025", "Otros"].index(record_data["Tipo"]) if record_data["Tipo"] in ["Licencia Ordinaria 2025", "Otros"] else 0)
+                    observaciones = st.text_area("Observaciones", value=record_data["Observaciones"], placeholder="Observaciones")
 
                     col_mod, col_del = st.columns(2)
                     if col_mod.form_submit_button("Guardar Cambios"):
