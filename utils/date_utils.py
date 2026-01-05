@@ -69,7 +69,7 @@ def format_duracion_licencia(fecha_inicio, fecha_fin):
         
         for _, row in df_manual.iterrows():
             try:
-                fecha_dt = pd.to_datetime(row['Fecha'], errors='coerce')
+                fecha_dt = pd.to_datetime(row['Fecha'], errors='coerce', dayfirst=True)
                 if pd.notna(fecha_dt):
                     f_str = fecha_dt.strftime('%Y-%m-%d')
                     motivo = str(row[motivo_col]) if motivo_col and pd.notna(row[motivo_col]) else "Feriado/Asueto"

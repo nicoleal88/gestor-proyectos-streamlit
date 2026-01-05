@@ -150,7 +150,7 @@ def seccion_calendario(client):
         events = []
         df_tasks = st.session_state.get("df_tareas", pd.DataFrame())
         if not df_tasks.empty:
-            df_tasks['Fecha límite'] = pd.to_datetime(df_tasks['Fecha límite'], errors='coerce')
+            df_tasks['Fecha límite'] = pd.to_datetime(df_tasks['Fecha límite'], errors='coerce', dayfirst=True)
             # Filtrar para excluir tareas con estado "Finalizada"
             df_active_tasks = df_tasks[df_tasks['Estado'] != 'Finalizada']
             for _, row in df_active_tasks.iterrows():
@@ -168,8 +168,8 @@ def seccion_calendario(client):
         
         df_vacations = st.session_state.get("df_vacaciones", pd.DataFrame())
         if not df_vacations.empty:
-            df_vacations['Fecha inicio'] = pd.to_datetime(df_vacations['Fecha inicio'], errors='coerce')
-            df_vacations['Fecha regreso'] = pd.to_datetime(df_vacations['Fecha regreso'], errors='coerce')
+            df_vacations['Fecha inicio'] = pd.to_datetime(df_vacations['Fecha inicio'], errors='coerce', dayfirst=True)
+            df_vacations['Fecha regreso'] = pd.to_datetime(df_vacations['Fecha regreso'], errors='coerce', dayfirst=True)
             for _, row in df_vacations.iterrows():
                 if pd.notna(row['Fecha inicio']) and pd.notna(row['Fecha regreso']):
                     # Usar la fecha de fin directamente (sin sumar un día) ya que ya es el día de regreso
@@ -189,8 +189,8 @@ def seccion_calendario(client):
         
         df_compensados = st.session_state.get("df_compensados", pd.DataFrame())
         if not df_compensados.empty:
-            df_compensados['Desde fecha'] = pd.to_datetime(df_compensados['Desde fecha'], errors='coerce')
-            df_compensados['Hasta fecha'] = pd.to_datetime(df_compensados['Hasta fecha'], errors='coerce')
+            df_compensados['Desde fecha'] = pd.to_datetime(df_compensados['Desde fecha'], errors='coerce', dayfirst=True)
+            df_compensados['Hasta fecha'] = pd.to_datetime(df_compensados['Hasta fecha'], errors='coerce', dayfirst=True)
             for _, row in df_compensados.iterrows():
                 if pd.notna(row['Desde fecha']) and pd.notna(row['Hasta fecha']):
                     # Check if time information is available and not empty
@@ -216,8 +216,8 @@ def seccion_calendario(client):
 
         df_eventos = st.session_state.get("df_eventos", pd.DataFrame())
         if not df_eventos.empty:
-            df_eventos['Desde fecha'] = pd.to_datetime(df_eventos['Desde fecha'], errors='coerce')
-            df_eventos['Hasta fecha'] = pd.to_datetime(df_eventos['Hasta fecha'], errors='coerce')
+            df_eventos['Desde fecha'] = pd.to_datetime(df_eventos['Desde fecha'], errors='coerce', dayfirst=True)
+            df_eventos['Hasta fecha'] = pd.to_datetime(df_eventos['Hasta fecha'], errors='coerce', dayfirst=True)
             for _, row in df_eventos.iterrows():
                 if pd.notna(row['Desde fecha']) and pd.notna(row['Hasta fecha']):
                     # Check if time information is available and not empty

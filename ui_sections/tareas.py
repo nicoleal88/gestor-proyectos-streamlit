@@ -110,7 +110,7 @@ def seccion_tareas(client, personal_list):
             if selected_responsables:
                 df_filtered = df_filtered[df_filtered['Responsable'].isin(selected_responsables)]
             
-            df_filtered['Fecha límite'] = pd.to_datetime(df_filtered['Fecha límite'], errors='coerce')
+            df_filtered['Fecha límite'] = pd.to_datetime(df_filtered['Fecha límite'], errors='coerce', dayfirst=True)
             df_display = df_filtered.sort_values(by="Fecha límite").copy()
             today = datetime.now().date()
             # Aplicar formato al título de la tarea

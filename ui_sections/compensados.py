@@ -18,8 +18,8 @@ def seccion_compensados(client, personal_list):
     if sheet is None: return
 
     if not df_compensados.empty:
-        df_compensados['Desde fecha'] = pd.to_datetime(df_compensados['Desde fecha'], errors='coerce')
-        df_compensados['Hasta fecha'] = pd.to_datetime(df_compensados['Hasta fecha'], errors='coerce')
+        df_compensados['Desde fecha'] = pd.to_datetime(df_compensados['Desde fecha'], errors='coerce', dayfirst=True)
+        df_compensados['Hasta fecha'] = pd.to_datetime(df_compensados['Hasta fecha'], errors='coerce', dayfirst=True)
         today = pd.to_datetime(datetime.now().date())
 
         # Calcular métricas basadas en TODOS los registros (no filtrados)

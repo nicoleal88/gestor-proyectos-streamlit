@@ -18,8 +18,8 @@ def seccion_vacaciones(client, personal_list):
     if sheet is None: return
 
     if not df_vacaciones.empty:
-        df_vacaciones['Fecha inicio'] = pd.to_datetime(df_vacaciones['Fecha inicio'], errors='coerce')
-        df_vacaciones['Fecha regreso'] = pd.to_datetime(df_vacaciones['Fecha regreso'], errors='coerce')
+        df_vacaciones['Fecha inicio'] = pd.to_datetime(df_vacaciones['Fecha inicio'], errors='coerce', dayfirst=True)
+        df_vacaciones['Fecha regreso'] = pd.to_datetime(df_vacaciones['Fecha regreso'], errors='coerce', dayfirst=True)
         # Ajustar la fecha fin para mostrar el último día de vacaciones (un día antes del regreso)
         df_vacaciones['Último día de vacaciones'] = df_vacaciones['Fecha regreso'] - pd.Timedelta(days=1)
 
@@ -87,9 +87,9 @@ def seccion_vacaciones(client, personal_list):
 
         def style_status(row):
             today = pd.to_datetime(datetime.now().date()).date()
-            start_date = pd.to_datetime(row['Fecha inicio']).date()
+            start_date = pd.to_datetime(row['Fecha inicio'], dayfirst=True).date()
             # La fecha regresa es el día que vuelve al trabajo, el último día es uno antes
-            last_vacation_day = (pd.to_datetime(row['Fecha regreso']) - pd.Timedelta(days=1)).date()
+            last_vacation_day = (pd.to_datetime(row['Fecha regreso'], dayfirst=True) - pd.Timedelta(days=1)).date()
             style = ''
             if start_date <= today and last_vacation_day >= today:
                 style = 'background-color: #1E90FF'  # En curso (blue)

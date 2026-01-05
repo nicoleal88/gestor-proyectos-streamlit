@@ -17,8 +17,8 @@ def mostrar_seccion_eventos(client):
     if sheet is None: return
 
     if not df_eventos.empty:
-        df_eventos['Desde fecha'] = pd.to_datetime(df_eventos['Desde fecha'], errors='coerce')
-        df_eventos['Hasta fecha'] = pd.to_datetime(df_eventos['Hasta fecha'], errors='coerce')
+        df_eventos['Desde fecha'] = pd.to_datetime(df_eventos['Desde fecha'], errors='coerce', dayfirst=True)
+        df_eventos['Hasta fecha'] = pd.to_datetime(df_eventos['Hasta fecha'], errors='coerce', dayfirst=True)
         today = pd.to_datetime(datetime.now().date())
         en_curso = ((df_eventos['Desde fecha'] <= today) & (df_eventos['Hasta fecha'] >= today)).sum()
         proximos = (df_eventos['Desde fecha'] > today).sum()
