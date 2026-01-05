@@ -1079,12 +1079,12 @@ def _tab_mapa(client):
     r = pdk.Deck(map_style=map_style_url, layers=layers, initial_view_state=view_state, tooltip=tooltip)
     with col_map:
         # st.caption(f"Centro del mapa: lat={center_lat:.5f}, lon={center_lon:.5f}")
-        st.pydeck_chart(r, use_container_width=True, height=700)
+        st.pydeck_chart(r, width='stretch', height=700)
 
     # Lista de viajes activos: Vehículo - Personas - Destino/Ubicación actual
     with col_list:
         st.markdown("##### Viajes activos")
-        if st.button("Actualizar", use_container_width=True):
+        if st.button("Actualizar", width='stretch'):
             refresh_data(client, SHEET_VIAJES_UPDATES)
             refresh_data(client, SHEET_VIAJES)
             st.rerun()

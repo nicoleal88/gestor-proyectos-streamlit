@@ -475,7 +475,7 @@ def mostrar_seccion_bienvenida():
                 margin=dict(l=0, r=0, t=0, b=0)
             )
             
-            st.plotly_chart(fig_temp, use_container_width=True)
+            st.plotly_chart(fig_temp, width='stretch')
         else:
             st.warning("No se pudo cargar el pronóstico de temperaturas")
     
@@ -533,7 +533,7 @@ def mostrar_seccion_bienvenida():
                 xaxis=dict(showgrid=False)
             )
             
-            st.plotly_chart(fig_lluvia_viento, use_container_width=True)
+            st.plotly_chart(fig_lluvia_viento, width='stretch')
         else:
             st.warning("No se pudo cargar el pronóstico de lluvia y viento")
     
@@ -747,7 +747,7 @@ def mostrar_seccion_bienvenida():
                     )
                 )
                 
-                st.plotly_chart(fig_tendencia, use_container_width=True, config={'displayModeBar': True})
+                st.plotly_chart(fig_tendencia, width='stretch', config={'displayModeBar': True})
         
         # Mostrar última actualización
         st.markdown(

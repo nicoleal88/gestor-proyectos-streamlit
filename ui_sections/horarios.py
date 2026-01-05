@@ -1177,7 +1177,7 @@ def seccion_horarios(client, personal_list):
                 clickmode='event+select'
             )
             
-            st.plotly_chart(fig_distribucion, use_container_width=True)
+            st.plotly_chart(fig_distribucion, width='stretch')
             
         else:
             display_name = get_employee_display(empleado_seleccionado, st.session_state.get('incognito_mode', False))
@@ -1558,7 +1558,7 @@ def seccion_horarios(client, personal_list):
                     opacity=0.7
                 )
                 
-                st.plotly_chart(fig_historial, use_container_width=True)
+                st.plotly_chart(fig_historial, width='stretch')
                 
                 # --- Gráfico de diferencias ---
                 st.subheader("Diferencia diaria (LIBRO - RELOJ)")
@@ -1720,7 +1720,7 @@ def seccion_horarios(client, personal_list):
                         )
                         
                         # Mostrar el gráfico
-                        st.plotly_chart(fig_diferencias, use_container_width=True)
+                        st.plotly_chart(fig_diferencias, width='stretch')
                         
                         # Mostrar métricas
                         col1, col2, col3, col4, col5 = st.columns(5)
@@ -1790,7 +1790,7 @@ def seccion_horarios(client, personal_list):
                             annotation_text="8 hs ideales",
                             annotation_position="top right"
                         )
-                        st.plotly_chart(fig_box_libro, use_container_width=True)
+                        st.plotly_chart(fig_box_libro, width='stretch')
                     else:
                         st.warning("No hay datos de LIBRO para mostrar")
                 
@@ -1821,7 +1821,7 @@ def seccion_horarios(client, personal_list):
                             annotation_text="8 hs ideales",
                             annotation_position="top right"
                         )
-                        st.plotly_chart(fig_box_reloj, use_container_width=True)
+                        st.plotly_chart(fig_box_reloj, width='stretch')
                     else:
                         st.warning("No hay datos de RELOJ para mostrar")
             else:

@@ -149,8 +149,8 @@ def mostrar_grafico_pronostico(datos_pronostico):
     )
     
     # Mostrar gráficos
-    st.plotly_chart(fig_temp, use_container_width=True)
-    st.plotly_chart(fig_lluvia_viento, use_container_width=True)
+    st.plotly_chart(fig_temp, width='stretch')
+    st.plotly_chart(fig_lluvia_viento, width='stretch')
     
     # Mostrar resumen de cada día
     st.markdown("### Detalle por día")
