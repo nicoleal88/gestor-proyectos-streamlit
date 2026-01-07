@@ -18,8 +18,8 @@ def seccion_vacaciones(client, personal_list):
     if sheet is None: return
 
     if not df_vacaciones.empty:
-        df_vacaciones['Fecha inicio'] = pd.to_datetime(df_vacaciones['Fecha inicio'], errors='coerce', dayfirst=True)
-        df_vacaciones['Fecha regreso'] = pd.to_datetime(df_vacaciones['Fecha regreso'], errors='coerce', dayfirst=True)
+        df_vacaciones['Fecha inicio'] = pd.to_datetime(df_vacaciones['Fecha inicio'], errors='coerce', dayfirst=True, format='mixed')
+        df_vacaciones['Fecha regreso'] = pd.to_datetime(df_vacaciones['Fecha regreso'], errors='coerce', dayfirst=True, format='mixed')
         # Ajustar la fecha fin para mostrar el último día de vacaciones (un día antes del regreso)
         df_vacaciones['Último día de vacaciones'] = df_vacaciones['Fecha regreso'] - pd.Timedelta(days=1)
 
@@ -87,9 +87,9 @@ def seccion_vacaciones(client, personal_list):
 
         def style_status(row):
             today = pd.to_datetime(datetime.now().date()).date()
-            start_date = pd.to_datetime(row['Fecha inicio'], dayfirst=True).date()
+            start_date = pd.to_datetime(row['Fecha inicio'], dayfirst=True, format='mixed').date()
             # La fecha regresa es el día que vuelve al trabajo, el último día es uno antes
-            last_vacation_day = (pd.to_datetime(row['Fecha regreso'], dayfirst=True) - pd.Timedelta(days=1)).date()
+            last_vacation_day = (pd.to_datetime(row['Fecha regreso'], dayfirst=True, format='mixed') - pd.Timedelta(days=1)).date()
             style = ''
             if start_date <= today and last_vacation_day >= today:
                 style = 'background-color: #1E90FF'  # En curso (blue)
@@ -166,8 +166,8 @@ def seccion_vacaciones(client, personal_list):
                 # Entradas en vivo para la edición
                 st.markdown("---")
                 col1, col2 = st.columns(2)
-                edit_inicio = col1.date_input("Modificar inicio", value=pd.to_datetime(record_data["Fecha inicio"]), key=f"edit_vac_ini_{row_number_to_edit}", format="DD/MM/YYYY")
-                edit_regreso = col2.date_input("Modificar regreso", value=pd.to_datetime(record_data["Fecha regreso"]), key=f"edit_vac_reg_{row_number_to_edit}", format="DD/MM/YYYY")
+                edit_inicio = col1.date_input("Modificar inicio", value=pd.to_datetime(record_data["Fecha inicio"], dayfirst=True, format='mixed'), key=f"edit_vac_ini_{row_number_to_edit}", format="DD/MM/YYYY")
+                edit_regreso = col2.date_input("Modificar regreso", value=pd.to_datetime(record_data["Fecha regreso"], dayfirst=True, format='mixed'), key=f"edit_vac_reg_{row_number_to_edit}", format="DD/MM/YYYY")
 
                 if edit_regreso > edit_inicio:
                     ultimo_dia_edit = edit_regreso - pd.Timedelta(days=1)
@@ -178,7 +178,7 @@ def seccion_vacaciones(client, personal_list):
 
                 with st.form(f"edit_vac_form_{row_number_to_edit}"):
                     nombre = st.selectbox("Apellido, Nombres", options=["Seleccione persona..."] + personal_list, index=personal_list.index(record_data["Apellido, Nombres"]) + 1 if record_data["Apellido, Nombres"] in personal_list else 0)
-                    fecha_solicitud = st.date_input("Fecha Solicitud", value=pd.to_datetime(record_data["Fecha solicitud"]), format="DD/MM/YYYY")
+                    fecha_solicitud = st.date_input("Fecha Solicitud", value=pd.to_datetime(record_data["Fecha solicitud"], dayfirst=True, format='mixed'), format="DD/MM/YYYY")
                     tipo = st.selectbox("Tipo", options=["Licencia Ordinaria 2025", "Otros"], index=["Licencia Ordinaria 2025", "Otros"].index(record_data["Tipo"]) if record_data["Tipo"] in ["Licencia Ordinaria 2025", "Otros"] else 0)
                     observaciones = st.text_area("Observaciones", value=record_data["Observaciones"], placeholder="Observaciones")
 

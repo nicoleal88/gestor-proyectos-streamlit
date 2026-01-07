@@ -110,7 +110,7 @@ def seccion_tareas(client, personal_list):
             if selected_responsables:
                 df_filtered = df_filtered[df_filtered['Responsable'].isin(selected_responsables)]
             
-            df_filtered['Fecha límite'] = pd.to_datetime(df_filtered['Fecha límite'], errors='coerce', dayfirst=True)
+            df_filtered['Fecha límite'] = pd.to_datetime(df_filtered['Fecha límite'], errors='coerce', dayfirst=True, format='mixed')
             df_display = df_filtered.sort_values(by="Fecha límite").copy()
             today = datetime.now().date()
             # Aplicar formato al título de la tarea
@@ -268,7 +268,7 @@ def seccion_tareas(client, personal_list):
                         titulo_tarea = st.text_input("Título Tarea", value=task_data['Título Tarea'])
                         tarea = st.text_area("Descripción Completa", value=task_data['Tarea'])
                         responsable = st.selectbox("Responsable", options=["Seleccione persona..."] + personal_list, index=personal_list.index(task_data["Responsable"]) + 1 if task_data["Responsable"] in personal_list else 0)
-                        fecha_limite = st.date_input("Fecha límite", value=pd.to_datetime(task_data["Fecha límite"]), format="DD/MM/YYYY")
+                        fecha_limite = st.date_input("Fecha límite", value=pd.to_datetime(task_data["Fecha límite"], dayfirst=True, format='mixed'), format="DD/MM/YYYY")
                         estado = st.selectbox("Estado", ["Pendiente", "En curso", "Finalizada"], index=["Pendiente", "En curso", "Finalizada"].index(task_data["Estado"]))
                         
                         col_mod, col_del = st.columns(2)

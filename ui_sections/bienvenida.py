@@ -357,8 +357,8 @@ def mostrar_seccion_bienvenida():
     vac_en_curso = pd.DataFrame()
     if not df_vacaciones.empty and 'Fecha inicio' in df_vacaciones.columns:
         df_vac_tmp = df_vacaciones.copy()
-        df_vac_tmp['Fecha inicio'] = pd.to_datetime(df_vac_tmp['Fecha inicio'], errors='coerce', dayfirst=True)
-        df_vac_tmp['Fecha regreso'] = pd.to_datetime(df_vac_tmp['Fecha regreso'], errors='coerce', dayfirst=True)
+        df_vac_tmp['Fecha inicio'] = pd.to_datetime(df_vac_tmp['Fecha inicio'], errors='coerce', dayfirst=True, format='mixed')
+        df_vac_tmp['Fecha regreso'] = pd.to_datetime(df_vac_tmp['Fecha regreso'], errors='coerce', dayfirst=True, format='mixed')
         
         vac_en_curso = df_vac_tmp[
             (df_vac_tmp['Fecha inicio'] <= today) & 
@@ -375,8 +375,8 @@ def mostrar_seccion_bienvenida():
     comp_en_curso = pd.DataFrame()
     if not df_compensados.empty and 'Desde fecha' in df_compensados.columns:
         df_comp_tmp = df_compensados.copy()
-        df_comp_tmp['Desde fecha'] = pd.to_datetime(df_comp_tmp['Desde fecha'], errors='coerce', dayfirst=True)
-        df_comp_tmp['Hasta fecha'] = pd.to_datetime(df_comp_tmp['Hasta fecha'], errors='coerce', dayfirst=True)
+        df_comp_tmp['Desde fecha'] = pd.to_datetime(df_comp_tmp['Desde fecha'], errors='coerce', dayfirst=True, format='mixed')
+        df_comp_tmp['Hasta fecha'] = pd.to_datetime(df_comp_tmp['Hasta fecha'], errors='coerce', dayfirst=True, format='mixed')
         
         comp_en_curso = df_comp_tmp[
             (df_comp_tmp['Desde fecha'] <= today) & 

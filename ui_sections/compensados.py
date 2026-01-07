@@ -18,8 +18,8 @@ def seccion_compensados(client, personal_list):
     if sheet is None: return
 
     if not df_compensados.empty:
-        df_compensados['Desde fecha'] = pd.to_datetime(df_compensados['Desde fecha'], errors='coerce', dayfirst=True)
-        df_compensados['Hasta fecha'] = pd.to_datetime(df_compensados['Hasta fecha'], errors='coerce', dayfirst=True)
+        df_compensados['Desde fecha'] = pd.to_datetime(df_compensados['Desde fecha'], errors='coerce', dayfirst=True, format='mixed')
+        df_compensados['Hasta fecha'] = pd.to_datetime(df_compensados['Hasta fecha'], errors='coerce', dayfirst=True, format='mixed')
         today = pd.to_datetime(datetime.now().date())
 
         # Calcular métricas basadas en TODOS los registros (no filtrados)
@@ -222,13 +222,13 @@ def seccion_compensados(client, personal_list):
 
                 with st.form(f"edit_compensados_form_{row_number_to_edit}"):
                     nombre = st.selectbox("Apellido, Nombres", options=["Seleccione persona..."] + personal_list, index=personal_list.index(record_data["Apellido, Nombres"]) + 1 if record_data["Apellido, Nombres"] in personal_list else 0)
-                    fecha_solicitud = st.date_input("Fecha Solicitud", value=pd.to_datetime(record_data["Fecha Solicitud"]), format="DD/MM/YYYY")
+                    fecha_solicitud = st.date_input("Fecha Solicitud", value=pd.to_datetime(record_data["Fecha Solicitud"], dayfirst=True, format='mixed'), format="DD/MM/YYYY")
                     tipo = st.selectbox("Tipo", options=["Compensatorio"], index=0)
 
                     if st.session_state[tipo_compensatorio_key] == "Día completo":
                         col1, col2 = st.columns(2)
-                        desde_fecha = col1.date_input("Desde fecha", value=pd.to_datetime(record_data["Desde fecha"]), format="DD/MM/YYYY")
-                        hasta_fecha = col2.date_input("Hasta fecha", value=pd.to_datetime(record_data["Hasta fecha"]), format="DD/MM/YYYY")
+                        desde_fecha = col1.date_input("Desde fecha", value=pd.to_datetime(record_data["Desde fecha"], dayfirst=True, format='mixed'), format="DD/MM/YYYY")
+                        hasta_fecha = col2.date_input("Hasta fecha", value=pd.to_datetime(record_data["Hasta fecha"], dayfirst=True, format='mixed'), format="DD/MM/YYYY")
                         
                         if hasta_fecha >= desde_fecha:
                             msg_edit, d_c_edit, d_h_edit = format_duracion_licencia(desde_fecha, hasta_fecha)
@@ -240,7 +240,7 @@ def seccion_compensados(client, personal_list):
                         hasta_hora = None
                     else: # Por horas
                         col1, col2, col3 = st.columns(3)
-                        fecha = col1.date_input("Fecha", value=pd.to_datetime(record_data["Desde fecha"]), format="DD/MM/YYYY")
+                        fecha = col1.date_input("Fecha", value=pd.to_datetime(record_data["Desde fecha"], dayfirst=True, format='mixed'), format="DD/MM/YYYY")
                         desde_hora = col2.time_input("Desde hora", value=datetime.strptime(record_data["Desde hora"], '%H:%M').time() if not es_dia_completo and record_data["Desde hora"] and isinstance(record_data["Desde hora"], str) else None)
                         hasta_hora = col3.time_input("Hasta hora", value=datetime.strptime(record_data["Hasta hora"], '%H:%M').time() if not es_dia_completo and record_data["Hasta hora"] and isinstance(record_data["Hasta hora"], str) else None)
                         desde_fecha = fecha
