@@ -188,7 +188,7 @@ def build_drive_client():
         st.error(f"No fue posible inicializar el cliente de Google Drive: {e}")
         return None
 
-@st.cache_data(show_spinner=False)
+@st.cache_data(ttl=600, show_spinner=False)
 def list_csvs_in_folder(folder_id: str):
     """
     Lista archivos CSV en una carpeta de Drive por su Folder ID.
@@ -681,9 +681,9 @@ def seccion_horarios(client, personal_list):
         st.session_state['df_registros_horarios'] = None
         st.session_state['jornada_horarios'] = None
     
-    # Obtener lista de archivos del Drive
-    st.session_state['drive_csv_files'] = list_csvs_in_folder(DEFAULT_FOLDER_ID)
-    files_list_all = st.session_state.get('drive_csv_files', [])
+    # Obtener lista de archivos del Drive (usando caché)
+    files_list_all = list_csvs_in_folder(DEFAULT_FOLDER_ID)
+    st.session_state['drive_csv_files'] = files_list_all
     
     # Ordenar por nombre descendente (YYYY-MM) para asegurar los periodos más recientes cronológicamente
     files_list_all.sort(key=lambda x: x.get('name', ''), reverse=True)
@@ -708,16 +708,17 @@ def seccion_horarios(client, personal_list):
     # Periodos seleccionados por defecto (los 6 más recientes)
     default_periods = available_periods[:6]
     
+    # Inicializar el estado si no existe para el widget con key
+    if 'last_selected_periods' not in st.session_state:
+        st.session_state['last_selected_periods'] = default_periods
+    
     # Multiselector para elegir periodos
     selected_periods = st.multiselect(
         "Selecciona los periodos a analizar:",
         options=available_periods,
-        default=st.session_state.get('last_selected_periods', default_periods),
+        key='last_selected_periods',
         help="Los archivos seleccionados se descargarán y procesarán para el análisis."
     )
-    
-    # Guardar selección actual
-    st.session_state['last_selected_periods'] = selected_periods
     
     # Obtener IDs de los periodos seleccionados (asegurando que sea una lista)
     file_ids_to_load = [period_to_id[p] for p in (selected_periods or []) if p in period_to_id]
