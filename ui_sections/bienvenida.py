@@ -68,6 +68,8 @@ def formatear_fecha_espanol(datetime_obj, formato='completo'):
         return f"{dia_semana}, {dia} de {mes} de {anio}"
     elif formato == 'corto':
         return f"{dia:02d}/{datetime_obj.month:02d}/{anio}"
+    elif formato == 'dia_semana':
+        return dia_semana
     else:
         return f"{dia_semana}, {dia} de {mes} de {anio}"
 
@@ -345,6 +347,72 @@ def mostrar_seccion_bienvenida():
         fecha = formatear_fecha_espanol(now, formato='completo')
     
     st.subheader(f"📅 {fecha}")
+    
+    # --- ALERTAS DE PERSONAL (Cumpleaños y Aniversarios) ---
+    df_personal = st.session_state.get('df_personal', pd.DataFrame())
+    if not df_personal.empty:
+        today_date = now.date()
+        lookahead = today_date + pd.Timedelta(days=7)
+        personal_alerts = []
+
+        for _, row in df_personal.iterrows():
+            nombre_completo = row.get('Apellido, Nombres', row.get('Nombre', ''))
+            if not nombre_completo: continue
+            
+            # Obtener nombre de pila
+            if ',' in str(nombre_completo):
+                partes = str(nombre_completo).split(',')
+                nombre_pila = partes[1].strip() if len(partes) > 1 else partes[0].strip()
+            else:
+                nombre_pila = str(nombre_completo).split(' ')[0]
+
+            # 🎂 Cumpleaños
+            col_nac = 'Fecha de nacimiento'
+            if col_nac in row and pd.notna(row[col_nac]):
+                try:
+                    dob = pd.to_datetime(row[col_nac], dayfirst=True, format='mixed').date()
+                    for anio in [today_date.year, today_date.year + 1]:
+                        try:
+                            bday = dob.replace(year=anio)
+                        except ValueError: # Feb 29
+                            bday = dob.replace(year=anio, month=3, day=1)
+                        
+                        if today_date <= bday <= lookahead:
+                            edad = anio - dob.year
+                            dia_sem = formatear_fecha_espanol(bday, formato='dia_semana').lower()
+                            if bday == today_date:
+                                personal_alerts.append(f"🎂 **{nombre_pila}** cumple **{edad} años** ¡HOY!")
+                            else:
+                                personal_alerts.append(f"🎂 **{nombre_pila}** cumple **{edad} años** el próximo {dia_sem} ({bday.strftime('%d/%m')})")
+                except: pass
+
+            # 🎖️ Aniversarios de Trabajo (múltiplos de 5)
+            col_pao = 'Fecha ingreso PAO'
+            if col_pao in row and pd.notna(row[col_pao]):
+                try:
+                    ingreso = pd.to_datetime(row[col_pao], dayfirst=True, format='mixed').date()
+                    for anio in [today_date.year, today_date.year + 1]:
+                        try:
+                            anniv = ingreso.replace(year=anio)
+                        except ValueError:
+                            anniv = ingreso.replace(year=anio, month=3, day=1)
+                        
+                        if today_date <= anniv <= lookahead:
+                            anios_serv = anio - ingreso.year
+                            if anios_serv > 0 and anios_serv % 5 == 0:
+                                if anniv == today_date:
+                                    personal_alerts.append(f"🎖️ **{nombre_pila}** cumple **{anios_serv} años** de trabajo ¡HOY!")
+                                else:
+                                    personal_alerts.append(f"🎖️ **{nombre_pila}** cumple **{anios_serv} años** de trabajo el {formatear_fecha_espanol(anniv, formato='corto')}")
+                except: pass
+
+        if personal_alerts:
+            # Mostrar alertas en un contenedor destacado
+            with st.container():
+                for alert in personal_alerts:
+                    st.toast(alert, icon="🎊") # Opcional: toast para llamar la atención
+                    st.info(alert)
+    
     st.markdown("---")
 
     # --- RESUMEN DE PERSONAL EN CURSO ---
