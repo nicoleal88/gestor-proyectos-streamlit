@@ -7,6 +7,7 @@ import re
 import numpy as np
 from datetime import datetime, timedelta
 from io import BytesIO
+import os
 
 # Imports opcionales para Google Drive (no rompen si no están instalados)
 try:
@@ -175,8 +176,13 @@ def build_drive_client():
     if not HAS_GOOGLE_DRIVE:
         return None
     try:
+        # Buscar credenciales.json en la raíz del proyecto (un nivel arriba de ui_sections/)
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        root_dir = os.path.dirname(current_dir)
+        creds_path = os.path.join(root_dir, "credenciales.json")
+        
         creds = service_account.Credentials.from_service_account_file(
-            "credenciales.json",
+            creds_path,
             scopes=["https://www.googleapis.com/auth/drive.readonly"],
         )
         service = build("drive", "v3", credentials=creds, cache_discovery=False)

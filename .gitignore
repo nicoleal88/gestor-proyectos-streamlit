@@ -20,5 +20,4 @@ log/
 logs/deploy.log
 logs/*.log
 docs/sd.txt
-utils/__pycache__/*
-
+utils/__pycache__/

@@ -1,12 +1,16 @@
 import streamlit as st
 import gspread
 import pandas as pd
+import os
 
 # --- CONFIGURACIÓN DE GOOGLE SHEETS ---
 @st.cache_resource
 def connect_to_google_sheets():
     try:
-        client = gspread.service_account("credenciales.json")
+        # Usar ruta absoluta relativa al archivo actual
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        creds_path = os.path.join(current_dir, "credenciales.json")
+        client = gspread.service_account(creds_path)
         return client
     except FileNotFoundError:
         st.error("Error: El archivo 'credenciales.json' no se encontró.")
