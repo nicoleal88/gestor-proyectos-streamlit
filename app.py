@@ -3,7 +3,7 @@ from google_sheets_client import connect_to_google_sheets, init_session_state
 from typing import Dict, List, Optional, Callable
 import importlib
 import os
-from version_manager import display_simple_version_sidebar
+
 
 # Mapeo de roles a permisos
 ROLES_PERMISOS = {
@@ -150,20 +150,17 @@ def main():
     
     # Mostrar navegación y ejecutar la página seleccionada
     if pages:
-        # Sidebar: Información del usuario y navegación
+        # 1. Logo e información del usuario (al principio del sidebar)
         with st.sidebar:
+            st.image("data/Logo-Auger.png", width=100)
             st.markdown(f"## **Usuario:** {st.user.name}")
             st.markdown(f"**Rol:** {rol_usuario.capitalize()}")
             st.button("Cerrar sesión", on_click=st.logout)
             st.markdown("---")
 
-            # Mostrar información de versión
-            display_simple_version_sidebar()
+        # 2. Navegación (el menú aparecerá debajo de lo anterior)
+        selected_page = st.navigation(pages)
 
-            st.markdown("---")
-
-            # Mostrar navegación en el sidebar
-            selected_page = st.navigation(pages)
 
         # Área principal: Ejecutar la página seleccionada
         # Guardar la sección actual para que las páginas puedan detectar cambios de sección
