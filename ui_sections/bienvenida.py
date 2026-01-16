@@ -359,12 +359,22 @@ def mostrar_seccion_bienvenida():
             nombre_completo = row.get('Apellido, Nombres', row.get('Nombre', ''))
             if not nombre_completo: continue
             
-            # Obtener nombre de pila
-            if ',' in str(nombre_completo):
-                partes = str(nombre_completo).split(',')
-                nombre_pila = partes[1].strip() if len(partes) > 1 else partes[0].strip()
+            # Obtener nombre a mostrar (Nombre + Inicial Apellido)
+            nombre_str = str(nombre_completo)
+            if ',' in nombre_str:
+                partes = nombre_str.split(',')
+                apellido = partes[0].strip()
+                nombres = partes[1].strip() if len(partes) > 1 else ""
+                # Primer nombre
+                nombre_pila = nombres.split(' ')[0] if nombres else apellido
+                # Inicial del apellido
+                inicial_apellido = apellido[0].upper() if apellido else ""
+                nombre_mostrar = f"{nombre_pila} {inicial_apellido}." if inicial_apellido else nombre_pila
             else:
-                nombre_pila = str(nombre_completo).split(' ')[0]
+                partes = nombre_str.split(' ')
+                nombre_pila = partes[0]
+                inicial_apellido = partes[1][0].upper() if len(partes) > 1 else ""
+                nombre_mostrar = f"{nombre_pila} {inicial_apellido}." if inicial_apellido else nombre_pila
 
             # 🎂 Cumpleaños
             col_nac = 'Fecha de nacimiento'
@@ -381,9 +391,9 @@ def mostrar_seccion_bienvenida():
                             edad = anio - dob.year
                             dia_sem = formatear_fecha_espanol(bday, formato='dia_semana').lower()
                             if bday == today_date:
-                                personal_alerts.append(f"🎂 **{nombre_pila}** cumple **{edad} años** ¡HOY!")
+                                personal_alerts.append(f"🎂 **{nombre_mostrar}** cumple **{edad} años** ¡HOY!")
                             else:
-                                personal_alerts.append(f"🎂 **{nombre_pila}** cumple **{edad} años** el próximo {dia_sem} ({bday.strftime('%d/%m')})")
+                                personal_alerts.append(f"🎂 **{nombre_mostrar}** cumple **{edad} años** el próximo {dia_sem} ({bday.strftime('%d/%m')})")
                 except: pass
 
             # 🎖️ Aniversarios de Trabajo (múltiplos de 5)
@@ -401,9 +411,9 @@ def mostrar_seccion_bienvenida():
                             anios_serv = anio - ingreso.year
                             if anios_serv > 0 and anios_serv % 5 == 0:
                                 if anniv == today_date:
-                                    personal_alerts.append(f"🎖️ **{nombre_pila}** cumple **{anios_serv} años** de trabajo ¡HOY!")
+                                    personal_alerts.append(f"🎖️ **{nombre_mostrar}** cumple **{anios_serv} años** de trabajo ¡HOY!")
                                 else:
-                                    personal_alerts.append(f"🎖️ **{nombre_pila}** cumple **{anios_serv} años** de trabajo el {formatear_fecha_espanol(anniv, formato='corto')}")
+                                    personal_alerts.append(f"🎖️ **{nombre_mostrar}** cumple **{anios_serv} años** de trabajo el {formatear_fecha_espanol(anniv, formato='corto')}")
                 except: pass
 
         if personal_alerts:
