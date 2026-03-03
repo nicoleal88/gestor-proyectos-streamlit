@@ -1267,9 +1267,9 @@ def seccion_horarios(client, personal_list):
                         fechas_unicas = pd.date_range(start=start_date, end=end_date).date
                     except Exception:
                         fechas_unicas = df_plot['fecha'].unique() if not df_plot.empty else []
-                elif not df_plot.empty:
-                    # Usar el rango de fechas presentes en df_plot (que ya está filtrado por los periodos subidos)
-                    all_fechas = df_plot['fecha'].tolist()
+                elif not df_registros.empty:
+                    # Usar el rango de fechas presentes en TODOS los registros cargados (los meses/archivos seleccionados)
+                    all_fechas = pd.to_datetime(df_registros['fecha_hora']).dt.date.tolist()
                     min_date = min(all_fechas)
                     max_date = max(all_fechas)
                     fechas_unicas = pd.date_range(start=min_date, end=max_date).date
@@ -1311,6 +1311,10 @@ def seccion_horarios(client, personal_list):
                         if col not in df_compensatorios_plot.columns:
                             df_compensatorios_plot[col] = None
                     
+                    # Filtrar por el rango de fechas visibles (fechas_unicas)
+                    set_fechas = set(fechas_unicas)
+                    df_compensatorios_plot = df_compensatorios_plot[df_compensatorios_plot['fecha'].isin(set_fechas)]
+                    
                     # Asegurar columna 'tipo_detalle' en df_completo antes de concatenar
                     if 'tipo_detalle' not in df_completo.columns:
                         df_completo['tipo_detalle'] = ''
@@ -1330,6 +1334,11 @@ def seccion_horarios(client, personal_list):
                             df_vacaciones_plot[col] = None
                     if 'tipo_detalle' not in df_vacaciones_plot.columns:
                         df_vacaciones_plot['tipo_detalle'] = ''
+                    
+                    # Filtrar por el rango de fechas visibles (fechas_unicas)
+                    set_fechas = set(fechas_unicas)
+                    df_vacaciones_plot = df_vacaciones_plot[df_vacaciones_plot['fecha'].isin(set_fechas)]
+                    
                     # Preparar frame a agregar con mismas columnas y orden que df_completo
                     to_add_vac = df_vacaciones_plot.reindex(columns=df_completo.columns)
                     # Evitar concat con frames vacíos o totalmente NA para prevenir FutureWarning
