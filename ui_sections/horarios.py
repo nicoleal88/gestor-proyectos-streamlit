@@ -8,6 +8,7 @@ import numpy as np
 from datetime import datetime, timedelta
 from io import BytesIO
 import os
+from utils.date_utils import get_feriados_argentina
 
 # Imports opcionales para Google Drive (no rompen si no están instalados)
 try:
@@ -1341,7 +1342,46 @@ def seccion_horarios(client, personal_list):
                     # Evitar concat con frames vacíos o totalmente NA para prevenir FutureWarning
                     if not to_add_vac.empty and not to_add_vac.isna().all(axis=None):
                         df_completo = pd.concat([df_completo, to_add_vac], ignore_index=True)
-                
+
+                # --- Agregar Feriados ---
+                try:
+                    years_in_plot = pd.to_datetime(list(fechas_unicas)).year.unique()
+                    feriados_dict = {}
+                    for y in years_in_plot:
+                        feriados_dict.update(get_feriados_argentina(y))
+                    
+                    df_manual = st.session_state.get("df_feriados_manuales", pd.DataFrame())
+                    if not df_manual.empty and 'Fecha' in df_manual.columns:
+                        for _, row in df_manual.iterrows():
+                            try:
+                                f_dt = pd.to_datetime(row['Fecha'], errors='coerce', dayfirst=True, format='mixed')
+                                if pd.notna(f_dt):
+                                    f_str = f_dt.strftime('%Y-%m-%d')
+                                    label = row.get('Motivo (Opcional)') or row.get('Motivo') or 'Feriado/Asueto'
+                                    feriados_dict[f_str] = label
+                            except: continue
+
+                    rows_feriados = []
+                    for f_str, f_name in feriados_dict.items():
+                        f_date = datetime.strptime(f_str, '%Y-%m-%d').date()
+                        if f_date in fechas_unicas:
+                            rows_feriados.append({
+                                'fecha': f_date,
+                                'fecha_dt': pd.to_datetime(f_date),
+                                'duracion_horas': 8.0,
+                                'tipo_combinado': 'FERIADOS',
+                                'tipo_detalle': f_name,
+                                'es_salida_campo': False
+                            })
+                    
+                    if rows_feriados:
+                        df_feriados_plot = pd.DataFrame(rows_feriados)
+                        to_add_fer = df_feriados_plot.reindex(columns=df_completo.columns)
+                        if not to_add_fer.empty and not to_add_fer.isna().all(axis=None):
+                            df_completo = pd.concat([df_completo, to_add_fer], ignore_index=True)
+                except Exception as e:
+                    st.warning(f"No se pudieron cargar los feriados para el gráfico: {e}")
+
                 # Ordenar por fecha y tipo
                 df_completo = df_completo.sort_values(['fecha', 'tipo_combinado'])
                 
@@ -1395,7 +1435,7 @@ def seccion_horarios(client, personal_list):
                         if h_ini and h_fin:
                             return f"Por horas ({h_ini}-{h_fin})"
                         return "Día completo"
-                    if row.get('tipo_combinado') == 'VACACIONES':
+                    if row.get('tipo_combinado') in ['VACACIONES', 'FERIADOS']:
                         return (row.get('tipo_detalle') or '').strip()
                     return ''
                 df_plot['tipo_detalle_final'] = df_plot.apply(_calc_detalle_final, axis=1)
@@ -1424,9 +1464,10 @@ def seccion_horarios(client, personal_list):
                         'LIBRO': '#1f77b4',
                         'RELOJ': '#ff7f0e',
                         'AUSENCIAS': '#9b59b6',
-                        'VACACIONES': '#16a085'
+                        'VACACIONES': '#16a085',
+                        'FERIADOS': '#f1c40f'
                     },
-                    category_orders={'fecha': fechas_unicas, 'tipo_combinado': ["LIBRO", "RELOJ", "AUSENCIAS", "VACACIONES"]},
+                    category_orders={'fecha': fechas_unicas, 'tipo_combinado': ["LIBRO", "RELOJ", "AUSENCIAS", "VACACIONES", "FERIADOS"]},
                     template='plotly_white',
                     custom_data=['fecha_formateada', 'tipo_combinado', 'es_salida_campo', 'tipo_detalle_final']
                 )
@@ -1525,7 +1566,7 @@ def seccion_horarios(client, personal_list):
                                         '<b>Posible salida al campo</b><br>'
                                     )
                                 else:
-                                    if tipo in ['AUSENCIAS','VACACIONES']:
+                                    if tipo in ['AUSENCIAS','VACACIONES', 'FERIADOS']:
                                         label = detalle if detalle else tipo
                                         hover_text = f'<b>{fecha_texto}</b><br>Tipo: {label} ({tipo})<br>Horas: {horas:.2f}'
                                     else:
