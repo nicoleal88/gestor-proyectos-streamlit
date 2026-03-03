@@ -1433,6 +1433,27 @@ def seccion_horarios(client, personal_list):
                     return ''
                 df_plot['tipo_detalle_final'] = df_plot.apply(_calc_detalle_final, axis=1)
 
+                # --- Cálculo de Base para Apilamiento (Stacking Manual) --- 
+                # Apilamos en Cluster de "Registros": RELOJ -> AUSENCIAS -> VACACIONES -> FERIADOS
+                # El LIBRO siempre tiene base 0 y estará en su propia columna lateral
+                df_plot['base_horas'] = 0.0
+                df_plot['duracion_horas'] = df_plot['duracion_horas'].fillna(0.0)
+                
+                for fecha in df_plot['fecha'].unique():
+                    mask_day = df_plot['fecha'] == fecha
+                    day_data = df_plot[mask_day]
+                    
+                    
+                    val_reloj = day_data[day_data['tipo_combinado'] == 'RELOJ']['duracion_horas'].sum()
+                    current_base = val_reloj
+                    # Apilar solo AUSENCIAS y VACACIONES sobre RELOJ
+                    for t in ['AUSENCIAS', 'VACACIONES']:
+                        mask_type = mask_day & (df_plot['tipo_combinado'] == t)
+                        if mask_type.any():
+                            df_plot.loc[mask_type, 'base_horas'] = current_base
+                            current_base += df_plot.loc[mask_type, 'duracion_horas'].sum()
+                    # FERIADOS y LIBRO mantienen base_horas = 0.0 (inicializado arriba)
+
                 # -------- Gráfico integrado: LIBRO / RELOJ / AUSENCIAS / VACACIONES --------
                 fechas_unicas = sorted(df_plot['fecha'].unique()) if not df_plot.empty else []
                 n_fechas = len(fechas_unicas)
@@ -1460,19 +1481,28 @@ def seccion_horarios(client, personal_list):
                         'VACACIONES': '#16a085',
                         'FERIADOS': '#f1c40f'
                     },
-                    category_orders={'fecha': fechas_unicas, 'tipo_combinado': ["LIBRO", "RELOJ", "AUSENCIAS", "VACACIONES", "FERIADOS"]},
+                    category_orders={'fecha': fechas_unicas, 'tipo_combinado': ["FERIADOS", "LIBRO", "RELOJ", "AUSENCIAS", "VACACIONES"]},
                     template='plotly_white',
-                    custom_data=['fecha_formateada', 'tipo_combinado', 'es_salida_campo', 'tipo_detalle_final']
+                    custom_data=['fecha_formateada', 'tipo_combinado', 'es_salida_campo', 'tipo_detalle_final'],
+                    base='base_horas'
                 )
 
-                # Aplicar un leve offset y ajuste de ancho a la serie de VACACIONES
+                # Ajustar posiciones (offset) y anchos para solapamiento descentrado
+                # FERIADOS un poco a la izquierda, LIBRO un poco a la derecha, RELOJ al centro/frente
                 for tr in fig_historial.data:
-                    if getattr(tr, 'name', '') == 'VACACIONES':
-                        try:
-                            tr.offset = -0.3
-                            tr.width = 0.35
-                        except Exception:
-                            pass
+                    t_name = getattr(tr, 'name', '')
+                    if t_name == 'FERIADOS':
+                        tr.width = 0.6
+                        tr.offset = -0.15  # Se extiende de -0.15 a 0.45
+                        tr.opacity = 0.4
+                    elif t_name == 'LIBRO':
+                        tr.width = 0.6
+                        tr.offset = -0.1  # Se extiende de -0.1 a 0.5
+                        tr.opacity = 1
+                    elif t_name in ['RELOJ', 'AUSENCIAS', 'VACACIONES']:
+                        tr.width = 0.4
+                        tr.offset = -0.2  # Se extiende de -0.2 a 0.2 (CENTRO)
+                        tr.opacity = 1.0
                 
                 # Configurar el diseño del gráfico
                 fig_historial.update_layout(
@@ -1527,16 +1557,13 @@ def seccion_horarios(client, personal_list):
                     trace.marker.line.width = line_widths
                     trace.marker.line.color = line_colors
                 
-                # Asegurar que las barras se agrupen correctamente
+                # Asegurar que las barras se posicionen correctamente
                 fig_historial.update_layout(
                     xaxis={
                         'type': 'category',
                         'categoryorder': 'array',
                         'categoryarray': sorted(df_plot['fecha'].unique()) if not df_plot.empty else []
-                    },
-                    # Mejorar el espaciado entre grupos de barras
-                    bargap=0.15,
-                    bargroupgap=0.1
+                    }
                 )
                 
                 # Actualizar los textos de hover para mostrar información detallada
