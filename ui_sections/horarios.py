@@ -1267,19 +1267,12 @@ def seccion_horarios(client, personal_list):
                         fechas_unicas = pd.date_range(start=start_date, end=end_date).date
                     except Exception:
                         fechas_unicas = df_plot['fecha'].unique() if not df_plot.empty else []
-                elif not df_plot.empty or not df_compensatorios.empty or (df_vacaciones_plot is not None and not df_vacaciones_plot.empty):
-                    all_fechas = []
-                    if not df_plot.empty: all_fechas.extend(df_plot['fecha'].tolist())
-                    if not df_compensatorios.empty: all_fechas.extend(df_compensatorios['fecha'].tolist())
-                    if df_vacaciones_plot is not None and not df_vacaciones_plot.empty:
-                        all_fechas.extend(df_vacaciones_plot['fecha'].tolist())
-                    
-                    if all_fechas:
-                        min_date = min(all_fechas)
-                        max_date = max(all_fechas)
-                        fechas_unicas = pd.date_range(start=min_date, end=max_date).date
-                    else:
-                        fechas_unicas = []
+                elif not df_plot.empty:
+                    # Usar el rango de fechas presentes en df_plot (que ya está filtrado por los periodos subidos)
+                    all_fechas = df_plot['fecha'].tolist()
+                    min_date = min(all_fechas)
+                    max_date = max(all_fechas)
+                    fechas_unicas = pd.date_range(start=min_date, end=max_date).date
                 else:
                     fechas_unicas = df_plot['fecha'].unique() if not df_plot.empty else []
                 
