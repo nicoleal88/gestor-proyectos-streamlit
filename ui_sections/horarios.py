@@ -1644,10 +1644,11 @@ def seccion_horarios(client, personal_list):
                 st.subheader("Diferencia diaria (LIBRO - RELOJ)")
                 
                 # Crear un DataFrame con las diferencias
-                df_diferencias = df_completo.pivot(
+                df_diferencias = df_completo.pivot_table(
                     index='fecha', 
                     columns='tipo_combinado', 
-                    values='duracion_horas'
+                    values='duracion_horas',
+                    aggfunc='sum'
                 ).reset_index()
                 
                 # Calcular la diferencia LIBRO - RELOJ solo si ambos valores existen y son mayores a cero
