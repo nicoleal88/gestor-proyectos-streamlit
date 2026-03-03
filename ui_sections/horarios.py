@@ -1503,6 +1503,18 @@ def seccion_horarios(client, personal_list):
                         tr.width = 0.4
                         tr.offset = -0.2  # Se extiende de -0.2 a 0.2 (CENTRO)
                         tr.opacity = 1.0
+                        
+                        # Resaltar RELOJ de fines de semana (Sáb/Dom) con naranja rojizo
+                        if t_name == 'RELOJ':
+                            colors = []
+                            for date_val in tr.x:
+                                d_dt = pd.to_datetime(date_val)
+                                # Lunes=0, Domingo=6 -> Sáb(5), Dom(6)
+                                if d_dt.weekday() >= 5:
+                                    colors.append('#d35400') # Naranja rojizo
+                                else:
+                                    colors.append('#ff7f0e') # Naranja normal
+                            tr.marker.color = colors
                 
                 # Configurar el diseño del gráfico
                 fig_historial.update_layout(
