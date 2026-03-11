@@ -1651,53 +1651,82 @@ def seccion_horarios(client, personal_list):
                 )
                 
                 st.plotly_chart(fig_historial, use_container_width=True)
-                
-                # --- Diagrama de intervalos de trabajo (Timeline diario) - RELOJ ---
-                #st.subheader("Intervalos de trabajo (Entrada / Salida - RELOJ)")
+                               # --- Diagrama de intervalos de trabajo (Timeline diario) - RELOJ y COMPENSADOS ---
                 df_reloj_raw = df_filtrado[df_filtrado['tipo'] == 'RELOJ'].copy()
                 df_reloj_raw['fecha_only'] = df_reloj_raw['fecha_hora'].dt.date
                 
-                intervalos_reloj = []
+                intervalos_lista = []
+                
+                # 1. Procesar RELOJ
                 for f_dia, group in df_reloj_raw.groupby('fecha_only'):
                     group = group.sort_values('fecha_hora')
                     times = group['fecha_hora'].tolist()
-                    # Solo procesamos si hay registros y son pares
                     if len(times) > 0 and len(times) % 2 == 0:
                         for i in range(0, len(times), 2):
                             start = times[i]
                             end = times[i+1]
-                            # Duración en horas precisas
-                            duracion_segundos = (end - start).total_seconds()
-                            duracion_h = duracion_segundos / 3600
-                            # Formatear duración a HH:MM
-                            horas_int = int(duracion_segundos // 3600)
-                            minutos_int = int((duracion_segundos % 3600) // 60)
-                            duracion_hm = f"{horas_int}:{minutos_int:02d}"
-                            
-                            # Base (hora de inicio en formato decimal 0-24)
-                            base_h = start.hour + start.minute/60 + start.second/3600
-                            intervalos_reloj.append({
+                            dur = (end - start).total_seconds()
+                            intervalos_lista.append({
                                 'Fecha': f_dia,
                                 'Inicio': start.strftime('%H:%M'),
                                 'Fin': end.strftime('%H:%M'),
-                                'Duración': duracion_h, 
-                                'DuracionHM': duracion_hm,
-                                'Base': base_h
+                                'Duración': dur / 3600,
+                                'DuracionHM': f"{int(dur//3600)}:{int((dur%3600)//60):02d}",
+                                'Base': start.hour + start.minute/60 + start.second/3600,
+                                'Tipo': 'RELOJ'
                             })
                 
-                # Sincronizar eje X asegurando que todas las fechas estén presentes
-                df_intervals = pd.DataFrame(intervalos_reloj)
+                # 2. Procesar COMPENSADOS (AUSENCIAS)
+                if not df_compensatorios.empty:
+                    # Solo procesar compensados que estén dentro del periodo visible (fechas_unicas)
+                    set_fechas_visibles = set(fechas_unicas)
+                    df_comp_filtrado = df_compensatorios[df_compensatorios['fecha'].isin(set_fechas_visibles)].copy()
+                    
+                    for _, row in df_comp_filtrado.iterrows():
+                        f_dia = row['fecha']
+                        h_ini_str = row.get('hora_inicio') or ''
+                        h_fin_str = row.get('hora_fin') or ''
+                        
+                        if h_ini_str and h_fin_str:
+                            try:
+                                h_ini_dt = datetime.strptime(h_ini_str, '%H:%M')
+                                h_fin_dt = datetime.strptime(h_fin_str, '%H:%M')
+                                base_h = h_ini_dt.hour + h_ini_dt.minute/60
+                                end_h = h_fin_dt.hour + h_fin_dt.minute/60
+                                dur_h = end_h - base_h
+                                if dur_h > 0:
+                                    intervalos_lista.append({
+                                        'Fecha': f_dia,
+                                        'Inicio': h_ini_str,
+                                        'Fin': h_fin_str,
+                                        'Duración': dur_h,
+                                        'DuracionHM': f"{int(dur_h)}:{int((dur_h%1)*60):02d}",
+                                        'Base': base_h,
+                                        'Tipo': 'COMPENSADO'
+                                    })
+                            except: pass
+                        elif row.get('duracion_horas') == 8.0:
+                            # Caso Día Completo: Mostrar de 08:00 a 16:00 como bloque
+                            intervalos_lista.append({
+                                'Fecha': f_dia,
+                                'Inicio': '08:00',
+                                'Fin': '16:00',
+                                'Duración': 8.0,
+                                'DuracionHM': '8:00',
+                                'Base': 8.0,
+                                'Tipo': 'COMPENSADO'
+                            })
+
+                df_intervals = pd.DataFrame(intervalos_lista)
                 fechas_con_datos = set(df_intervals['Fecha'].tolist()) if not df_intervals.empty else set()
+                
+                # 3. Rellenar huecos para sincronizar eje X
                 dummy_rows = []
                 for f in fechas_unicas:
                     if f not in fechas_con_datos:
                         dummy_rows.append({
-                            'Fecha': f, 
-                            'Duración': 0.0, 
-                            'Base': 0.0, 
-                            'Inicio': '-', 
-                            'Fin': '-',
-                            'HoverDur': 0.0
+                            'Fecha': f, 'Duración': 0.0, 'Base': 0.0, 
+                            'Inicio': '-', 'Fin': '-', 'DuracionHM': '0:00', 'Tipo': 'RELOJ'
                         })
                 
                 if not df_intervals.empty:
@@ -1706,18 +1735,20 @@ def seccion_horarios(client, personal_list):
                 else:
                     df_intervals = pd.DataFrame(dummy_rows)
                 
-                df_intervals = df_intervals.sort_values('Fecha')
+                df_intervals = df_intervals.sort_values(['Fecha', 'Tipo'])
                 
                 fig_timeline = px.bar(
                     df_intervals,
                     x='Fecha',
                     y='Duración',
                     base='Base',
-                    title="Intervalos de trabajo (Entrada / Salida - RELOJ)",
-                    labels={'Fecha': 'Día', 'Duración': 'Intervalo', 'Base': 'Hora inicio'},
+                    color='Tipo',
+                    title="Intervalos de trabajo y compensados (RELOJ / COMP)",
+                    labels={'Fecha': 'Día', 'Duración': 'Intervalo', 'Base': 'Hora inicio', 'Tipo': 'Origen'},
                     template='plotly_white',
-                    color_discrete_sequence=['#ff7f0e'],
-                    barmode='overlay'
+                    color_discrete_map={'RELOJ': '#ff7f0e', 'COMPENSADO': '#9b59b6'},
+                    barmode='overlay',
+                    custom_data=['Inicio', 'Fin', 'DuracionHM']
                 )
                 
                 fig_timeline.update_layout(
@@ -1738,16 +1769,17 @@ def seccion_horarios(client, personal_list):
                         'ticktext': tick_text,
                         'tickfont': {'size': 10}
                     },
-                    height=400,
+                    height=450,
                     margin=dict(l=20, r=20, t=40, b=100),
-                    showlegend=False
+                    showlegend=True,
+                    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
                 )
                 
                 fig_timeline.update_traces(
-                    hovertemplate='<b>%{x}</b><br>Entrada: %{customdata[0]}<br>Salida: %{customdata[1]}<br>Duración: %{customdata[2]}hs<extra></extra>',
-                    customdata=df_intervals[['Inicio', 'Fin', 'DuracionHM']],
+                    hovertemplate='<b>%{x}</b> (%{fullData.name})<br>Entrada: %{customdata[0]}<br>Salida: %{customdata[1]}<br>Duración: %{customdata[2]}hs<extra></extra>',
                     marker_line_width=1,
-                    marker_line_color="rgba(0,0,0,0.3)"
+                    marker_line_color="rgba(0,0,0,0.3)",
+                    width=0.4 # Ajustar el ancho de la barra
                 )
                 
                 st.plotly_chart(fig_timeline, use_container_width=True)
