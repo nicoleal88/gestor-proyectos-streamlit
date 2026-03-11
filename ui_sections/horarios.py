@@ -1268,10 +1268,13 @@ def seccion_horarios(client, personal_list):
                     except Exception:
                         fechas_unicas = df_plot['fecha'].unique() if not df_plot.empty else []
                 elif not df_registros.empty:
-                    # Usar el rango de fechas presentes en TODOS los registros cargados (los meses/archivos seleccionados)
+                    import calendar
+                    # Rango del primer día del primer mes al último día del último mes detectado en los datos
                     all_fechas = pd.to_datetime(df_registros['fecha_hora']).dt.date.tolist()
-                    min_date = min(all_fechas)
-                    max_date = max(all_fechas)
+                    min_date = min(all_fechas).replace(day=1)
+                    max_date_raw = max(all_fechas)
+                    last_day = calendar.monthrange(max_date_raw.year, max_date_raw.month)[1]
+                    max_date = max_date_raw.replace(day=last_day)
                     fechas_unicas = pd.date_range(start=min_date, end=max_date).date
                 else:
                     fechas_unicas = df_plot['fecha'].unique() if not df_plot.empty else []
@@ -1647,7 +1650,107 @@ def seccion_horarios(client, personal_list):
                     opacity=0.7
                 )
                 
-                st.plotly_chart(fig_historial, width='stretch')
+                st.plotly_chart(fig_historial, use_container_width=True)
+                
+                # --- Diagrama de intervalos de trabajo (Timeline diario) - RELOJ ---
+                #st.subheader("Intervalos de trabajo (Entrada / Salida - RELOJ)")
+                df_reloj_raw = df_filtrado[df_filtrado['tipo'] == 'RELOJ'].copy()
+                df_reloj_raw['fecha_only'] = df_reloj_raw['fecha_hora'].dt.date
+                
+                intervalos_reloj = []
+                for f_dia, group in df_reloj_raw.groupby('fecha_only'):
+                    group = group.sort_values('fecha_hora')
+                    times = group['fecha_hora'].tolist()
+                    # Solo procesamos si hay registros y son pares
+                    if len(times) > 0 and len(times) % 2 == 0:
+                        for i in range(0, len(times), 2):
+                            start = times[i]
+                            end = times[i+1]
+                            # Duración en horas precisas
+                            duracion_segundos = (end - start).total_seconds()
+                            duracion_h = duracion_segundos / 3600
+                            # Formatear duración a HH:MM
+                            horas_int = int(duracion_segundos // 3600)
+                            minutos_int = int((duracion_segundos % 3600) // 60)
+                            duracion_hm = f"{horas_int}:{minutos_int:02d}"
+                            
+                            # Base (hora de inicio en formato decimal 0-24)
+                            base_h = start.hour + start.minute/60 + start.second/3600
+                            intervalos_reloj.append({
+                                'Fecha': f_dia,
+                                'Inicio': start.strftime('%H:%M'),
+                                'Fin': end.strftime('%H:%M'),
+                                'Duración': duracion_h, 
+                                'DuracionHM': duracion_hm,
+                                'Base': base_h
+                            })
+                
+                # Sincronizar eje X asegurando que todas las fechas estén presentes
+                df_intervals = pd.DataFrame(intervalos_reloj)
+                fechas_con_datos = set(df_intervals['Fecha'].tolist()) if not df_intervals.empty else set()
+                dummy_rows = []
+                for f in fechas_unicas:
+                    if f not in fechas_con_datos:
+                        dummy_rows.append({
+                            'Fecha': f, 
+                            'Duración': 0.0, 
+                            'Base': 0.0, 
+                            'Inicio': '-', 
+                            'Fin': '-',
+                            'HoverDur': 0.0
+                        })
+                
+                if not df_intervals.empty:
+                    if dummy_rows:
+                        df_intervals = pd.concat([df_intervals, pd.DataFrame(dummy_rows)], ignore_index=True)
+                else:
+                    df_intervals = pd.DataFrame(dummy_rows)
+                
+                df_intervals = df_intervals.sort_values('Fecha')
+                
+                fig_timeline = px.bar(
+                    df_intervals,
+                    x='Fecha',
+                    y='Duración',
+                    base='Base',
+                    title="Intervalos de trabajo (Entrada / Salida - RELOJ)",
+                    labels={'Fecha': 'Día', 'Duración': 'Intervalo', 'Base': 'Hora inicio'},
+                    template='plotly_white',
+                    color_discrete_sequence=['#ff7f0e'],
+                    barmode='overlay'
+                )
+                
+                fig_timeline.update_layout(
+                    yaxis=dict(
+                        range=[0, 24], 
+                        tickmode='linear',
+                        tick0=0,
+                        dtick=2,
+                        title_text='Hora del día (24hs)'
+                    ),
+                    xaxis={
+                        'type': 'category',
+                        'categoryorder': 'array',
+                        'categoryarray': fechas_unicas,
+                        'tickangle': -45,
+                        'tickmode': 'array',
+                        'tickvals': tick_vals,
+                        'ticktext': tick_text,
+                        'tickfont': {'size': 10}
+                    },
+                    height=400,
+                    margin=dict(l=20, r=20, t=40, b=100),
+                    showlegend=False
+                )
+                
+                fig_timeline.update_traces(
+                    hovertemplate='<b>%{x}</b><br>Entrada: %{customdata[0]}<br>Salida: %{customdata[1]}<br>Duración: %{customdata[2]}hs<extra></extra>',
+                    customdata=df_intervals[['Inicio', 'Fin', 'DuracionHM']],
+                    marker_line_width=1,
+                    marker_line_color="rgba(0,0,0,0.3)"
+                )
+                
+                st.plotly_chart(fig_timeline, use_container_width=True)
                 
                 # --- Gráfico de diferencias ---
                 st.subheader("Diferencia diaria (LIBRO - RELOJ)")
@@ -1880,14 +1983,15 @@ def seccion_horarios(client, personal_list):
                             annotation_text="8 hs ideales",
                             annotation_position="top right"
                         )
-                        st.plotly_chart(fig_box_libro, width='stretch')
+                        st.plotly_chart(fig_box_libro, use_container_width=True)
                     else:
                         st.warning("No hay datos de LIBRO para mostrar")
                 
                 with col2:
                     # Boxplot para RELOJ (excluyendo horas trabajadas = 0)
-                    df_reloj = df_completo[(df_completo['tipo_combinado'] == 'RELOJ') & 
-                                         (df_completo['duracion_horas'] > 0)]
+                    df_reloj = df_completo[(df_completo['tipo_combined'] == 'RELOJ') if 'tipo_combined' in df_completo.columns else (df_completo['tipo_combinado'] == 'RELOJ')]
+                    df_reloj = df_reloj[df_reloj['duracion_horas'] > 0]
+                    
                     if not df_reloj.empty:
                         fig_box_reloj = px.box(
                             df_reloj,
@@ -1911,7 +2015,7 @@ def seccion_horarios(client, personal_list):
                             annotation_text="8 hs ideales",
                             annotation_position="top right"
                         )
-                        st.plotly_chart(fig_box_reloj, width='stretch')
+                        st.plotly_chart(fig_box_reloj, use_container_width=True)
                     else:
                         st.warning("No hay datos de RELOJ para mostrar")
             else:
