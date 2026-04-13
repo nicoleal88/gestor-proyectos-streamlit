@@ -21,3 +21,4 @@ logs/deploy.log
 logs/*.log
 docs/sd.txt
 utils/__pycache__/
+docs/AGENTS.md
