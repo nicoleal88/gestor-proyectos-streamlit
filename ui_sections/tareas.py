@@ -7,7 +7,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 import streamlit as st
 import pandas as pd
 from datetime import datetime
-from google_sheets_client import get_sheet, refresh_data, get_sheet_data, update_cell_by_id
+from database import get_sheet, refresh_data, get_sheet_data, update_cell_by_id
 
 # --- FUNCIONES AUXILIARES ---
 def highlight_overdue(row):

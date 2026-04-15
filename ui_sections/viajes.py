@@ -14,7 +14,7 @@ from datetime import datetime
 from typing import List, Dict, Any, Optional
 import utm  # Added for coordinate conversion
 import math # Added for map jittering
-from google_sheets_client import get_sheet, get_sheet_data, refresh_data, update_cell_by_id
+from database import get_sheet, get_sheet_data, refresh_data, update_cell_by_id
 
 # --- Constantes ---
 SHEET_VEHICULOS = "Vehiculos"

@@ -2,6 +2,10 @@
 # Google Cloud credentials
 credenciales.json
 
+# SQLite database
+*.db
+data/*.db
+
 # Virtual environment
 /venv
 

@@ -1,5 +1,5 @@
 import streamlit as st
-from google_sheets_client import connect_to_google_sheets, init_session_state
+from database import connect_to_database, init_session_state
 from typing import Dict, List, Optional, Callable
 import importlib
 import os
@@ -120,8 +120,8 @@ def main():
     # Obtener rol del usuario
     rol_usuario = obtener_rol_usuario(st.user.email)
     
-    # Inicializar cliente de Google Sheets
-    client = connect_to_google_sheets()
+    # Inicializar cliente de base de datos SQLite
+    client = connect_to_database()
     if client:
         init_session_state(client)
     

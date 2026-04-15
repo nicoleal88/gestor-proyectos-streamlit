@@ -118,8 +118,8 @@ def seccion_calendario(client):
         st.subheader("🗓️ Calendario Unificado")
     
     # Botón para sincronizar manualmente todos los datos
-    if col2.button("🔄 Sincronizar Todo", width='stretch', help="Recarga datos de Google Sheets y Google Calendar"):
-        from google_sheets_client import refresh_all_data
+    if col2.button("🔄 Sincronizar Todo", width='stretch', help="Recarga datos de la base de datos y Google Calendar"):
+        from database import refresh_all_data
         with st.spinner('Sincronizando con Google Sheets...'):
             refresh_all_data(client)
             # Limpiar caché de eventos de Google para forzar recarga
