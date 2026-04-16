@@ -10,6 +10,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 import streamlit as st
 import pandas as pd
 from streamlit_calendar import calendar
+from database import get_sheet, insert_data, delete_data, refresh_data
  
 # Zona horaria fija: Argentina (independiente de la ubicación del servidor)
 try:
@@ -241,6 +242,16 @@ def seccion_calendario(client):
                         "color": "#DDA0DD"
                     })
 
+        # Añadir feriados manuales al calendario
+        df_feriados_manual = st.session_state.get("df_feriados_manuales", pd.DataFrame())
+        if not df_feriados_manual.empty:
+            for _, row in df_feriados_manual.iterrows():
+                events.append({
+                    "title": f"🎌 Feriado: {row['Motivo']}",
+                    "start": row['Fecha'],
+                    "color": "#FF4500"
+                })
+
         # Añadir eventos de Google Calendar
         events.extend(google_events)
         
@@ -284,4 +295,70 @@ def seccion_calendario(client):
         "timeZone": "America/Argentina/Buenos_Aires",
     }
 
-    calendar(events=st.session_state.calendar_events, options=calendar_options, key="calendar")
+    tab_calendario, tab_feriados = st.tabs(["📅 Calendario", "🎌 Feriados Manuales"])
+
+    with tab_calendario:
+        calendar(events=st.session_state.calendar_events, options=calendar_options, key="calendar")
+
+    with tab_feriados:
+        seccion_feriados_manuales(client)
+
+
+def seccion_feriados_manuales(client):
+    """Sección para gestionar feriados manuales."""
+    st.subheader("🎌 Feriados Manuales")
+    st.markdown("Agrega feriados que no son nacionales y que no aparecen en la API de feriados.")
+
+    df_feriados = st.session_state.get("df_feriados_manuales", pd.DataFrame())
+
+    tab_ver, tab_agregar = st.tabs(["📋 Ver Feriados", "➕ Agregar Feriado"])
+
+    with tab_ver:
+        if not df_feriados.empty:
+            df_display = df_feriados.copy()
+            df_display = df_display.sort_values(by='Fecha', ascending=False)
+            
+            for idx, row in df_display.iterrows():
+                col1, col2, col3 = st.columns([2, 4, 1])
+                with col1:
+                    st.markdown(f"**{row['Fecha']}**")
+                with col2:
+                    st.markdown(f"{row['Motivo']}")
+                with col3:
+                    if st.button("🗑️", key=f"del_feriado_{row['Fecha']}"):
+                        if delete_data("feriados", row['Fecha'], "Fecha"):
+                            refresh_data(client, "Feriados_Manuales")
+                            st.success(f"Feriado del {row['Fecha']} eliminado.")
+                            st.rerun()
+                st.divider()
+        else:
+            st.info("No hay feriados manuales cargados.")
+
+    with tab_agregar:
+        with st.form("agregar_feriado_form"):
+            col1, col2 = st.columns(2)
+            with col1:
+                fecha = st.date_input("Fecha", value=datetime.now(), min_value=datetime(2020, 1, 1))
+            with col2:
+                motivo = st.text_input("Motivo", placeholder="Ej: Feriado empresa")
+            
+            submit = st.form_submit_button("➕ Agregar Feriado", use_container_width=True)
+            
+            if submit:
+                if not motivo:
+                    st.error("Por favor, ingresa un motivo para el feriado.")
+                elif not fecha:
+                    st.error("Por favor, selecciona una fecha.")
+                else:
+                    fecha_str = fecha.strftime("%Y-%m-%d")
+                    existing = df_feriados[df_feriados['Fecha'] == fecha_str]
+                    if not existing.empty:
+                        st.warning(f"Ya existe un feriado registrado para el {fecha_str}.")
+                    else:
+                        data = {"Fecha": fecha_str, "Motivo": motivo}
+                        if insert_data("feriados", data):
+                            refresh_data(client, "Feriados_Manuales")
+                            st.success(f"Feriado '{motivo}' agregado para el {fecha_str}.")
+                            st.rerun()
+                        else:
+                            st.error("Error al agregar el feriados.")
