@@ -312,11 +312,11 @@ def get_database_client(db_path: Optional[str] = None) -> DatabaseClient:
 
 # Mapeo de nombres de hojas a tablas SQLite
 TABLE_NAMES = {
+    "Tareas": "tareas",
     "Vacaciones": "vacaciones",
     "Compensados": "compensados",
     "Personal": "personal",
-    "Calendario": "calendario",
-    "Horarios": "horarios",
+    "Eventos": "eventos",
     "Feriados_Manuales": "feriados",
 }
 
@@ -329,7 +329,7 @@ def connect_to_database():
 def init_session_state(client):
     """Inicializa el estado de la sesión para cada tabla. Compatible con google_sheets_client.init_session_state()."""
     import streamlit as st
-    sheets = ["Tareas", "Vacaciones", "Compensados", "Notas", "Personal", "Eventos", "Vehiculos", "Viajes", "ViajesUpdates", "Destinos", "Feriados_Manuales"]
+    sheets = ["Tareas", "Vacaciones", "Compensados", "Personal", "Eventos", "Feriados_Manuales"]
     for sheet_name in sheets:
         session_key = f"df_{sheet_name.lower()}"
         if session_key not in st.session_state:
@@ -435,7 +435,7 @@ def refresh_data(client, sheet_name):
 def refresh_all_data(client):
     """Refresca todos los DataFrames del estado de la sesión."""
     import streamlit as st
-    sheets = ["Tareas", "Vacaciones", "Compensados", "Notas", "Personal", "Eventos", "Vehiculos", "Viajes", "ViajesUpdates", "Destinos", "Feriados_Manuales"]
+    sheets = ["Tareas", "Vacaciones", "Compensados", "Personal", "Eventos", "Feriados_Manuales"]
     for sheet_name in sheets:
         table_name = TABLE_NAMES.get(sheet_name, sheet_name.lower())
         st.session_state[f"df_{sheet_name.lower()}"] = client.get_table(table_name)
