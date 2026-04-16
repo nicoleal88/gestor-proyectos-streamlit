@@ -44,19 +44,6 @@ SCHEMA = {
         "primary_key": None,
         "description": "Registro de horas compensadas"
     },
-    "notas": {
-        "columns": [
-            ("Fecha", "TEXT"),
-            ("Remitente", "TEXT"),
-            ("DNI", "TEXT"),
-            ("Teléfono", "TEXT"),
-            ("Motivo", "TEXT"),
-            ("Responsable", "TEXT"),
-            ("Estado", "TEXT"),
-        ],
-        "primary_key": None,
-        "description": "Notas y solicitudes"
-    },
     "personal": {
         "columns": [
             ("Apellido, Nombres", "TEXT"),
@@ -80,53 +67,6 @@ SCHEMA = {
         "primary_key": None,
         "description": "Eventos del calendario"
     },
-    "vehiculos": {
-        "columns": [
-            ("ID", "TEXT"),
-            ("Nombre", "TEXT"),
-            ("Tipo", "TEXT"),
-            ("Color", "TEXT"),
-            ("Kilometraje", "TEXT"),
-            ("Combustible", "TEXT"),
-        ],
-        "primary_key": "ID",
-        "description": "Registro de vehículos"
-    },
-    "viajes": {
-        "columns": [
-            ("ID", "TEXT"),
-            ("VehiculoID", "TEXT"),
-            ("PersonasJSON", "TEXT"),
-            ("SalidaISO", "TEXT"),
-            ("DestinoPrincipal", "TEXT"),
-            ("DestinosIntermediosJSON", "TEXT"),
-            ("Estado", "TEXT"),
-            ("CreatedAt", "TEXT"),
-        ],
-        "primary_key": "ID",
-        "description": "Registro de viajes"
-    },
-    "viajes_updates": {
-        "columns": [
-            ("TripID", "TEXT"),
-            ("TimestampISO", "TEXT"),
-            ("Lat", "TEXT"),
-            ("Lon", "TEXT"),
-            ("Notas", "TEXT"),
-        ],
-        "primary_key": "TripID",
-        "description": "Updates de viajes"
-    },
-    "destinos": {
-        "columns": [
-            ("Nombre", "TEXT"),
-            ("Lat", "TEXT"),
-            ("Lon", "TEXT"),
-            ("MostrarSiempre", "TEXT"),
-        ],
-        "primary_key": "Nombre",
-        "description": "Lista de destinos"
-    },
     "feriados": {
         "columns": [
             ("Fecha", "TEXT"),
@@ -134,15 +74,6 @@ SCHEMA = {
         ],
         "primary_key": "Fecha",
         "description": "Feriados manuales"
-    },
-    "comentarios": {
-        "columns": [
-            ("ID_Tarea", "TEXT"),
-            ("Fecha", "TEXT"),
-            ("Comentario", "TEXT"),
-        ],
-        "primary_key": ["ID_Tarea", "Fecha"],
-        "description": "Comentarios de tareas"
     },
 }
 
