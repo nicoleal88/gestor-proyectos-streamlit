@@ -1,4 +1,3 @@
-
 # Google Cloud credentials
 credenciales.json
 
@@ -26,3 +25,11 @@ logs/*.log
 docs/sd.txt
 utils/__pycache__/
 docs/AGENTS.md
+
+# Tests
+tests/__pycache__/
+tests/.pytest_cache/
+.pytest_cache/
+
+# Backup sections (disabled features)
+backup_disabled_sections/

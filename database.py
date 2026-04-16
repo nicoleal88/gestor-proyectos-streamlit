@@ -311,17 +311,12 @@ def get_database_client(db_path: Optional[str] = None) -> DatabaseClient:
 
 
 # Mapeo de nombres de hojas a tablas SQLite
-SHEET_TO_TABLE_MAP = {
-    "Tareas": "tareas",
+TABLE_NAMES = {
     "Vacaciones": "vacaciones",
     "Compensados": "compensados",
-    "Notas": "notas",
     "Personal": "personal",
-    "Eventos": "eventos",
-    "Vehiculos": "vehiculos",
-    "Viajes": "viajes",
-    "ViajesUpdates": "viajes_updates",
-    "Destinos": "destinos",
+    "Calendario": "calendario",
+    "Horarios": "horarios",
     "Feriados_Manuales": "feriados",
 }
 
@@ -338,13 +333,13 @@ def init_session_state(client):
     for sheet_name in sheets:
         session_key = f"df_{sheet_name.lower()}"
         if session_key not in st.session_state:
-            df = client.get_table(SHEET_TO_TABLE_MAP.get(sheet_name, sheet_name.lower()))
+            df = client.get_table(TABLE_NAMES.get(sheet_name, sheet_name.lower()))
             st.session_state[session_key] = df
 
 
 def get_sheet(client, sheet_name):
     """Retorna un wrapper de tabla compatible con get_sheet() de google_sheets_client."""
-    table_name = SHEET_TO_TABLE_MAP.get(sheet_name, sheet_name.lower())
+    table_name = TABLE_NAMES.get(sheet_name, sheet_name.lower())
     return TableWrapper(client, table_name)
 
 
@@ -378,7 +373,7 @@ class TableWrapper:
         success = insert_data(self.table_name, data)
         
         if success and st.session_state:
-            sheet_name_map = {v: k for k, v in SHEET_TO_TABLE_MAP.items()}
+            sheet_name_map = {v: k for k, v in TABLE_NAMES.items()}
             sheet_name = sheet_name_map.get(self.table_name, self.table_name)
             refresh_data(self.client, sheet_name)
         
@@ -425,14 +420,14 @@ class TableWrapper:
 def get_sheet_data(client, sheet_name):
     """Obtiene los datos de una hoja como DataFrame. Compatible con google_sheets_client."""
     import pandas as pd
-    table_name = SHEET_TO_TABLE_MAP.get(sheet_name, sheet_name.lower())
+    table_name = TABLE_NAMES.get(sheet_name, sheet_name.lower())
     return client.get_table(table_name)
 
 
 def refresh_data(client, sheet_name):
     """Refresca los datos de una tabla específica en el estado de la sesión."""
     import streamlit as st
-    table_name = SHEET_TO_TABLE_MAP.get(sheet_name, sheet_name.lower())
+    table_name = TABLE_NAMES.get(sheet_name, sheet_name.lower())
     st.session_state[f"df_{sheet_name.lower()}"] = client.get_table(table_name)
     st.cache_data.clear()
 
@@ -442,14 +437,14 @@ def refresh_all_data(client):
     import streamlit as st
     sheets = ["Tareas", "Vacaciones", "Compensados", "Notas", "Personal", "Eventos", "Vehiculos", "Viajes", "ViajesUpdates", "Destinos", "Feriados_Manuales"]
     for sheet_name in sheets:
-        table_name = SHEET_TO_TABLE_MAP.get(sheet_name, sheet_name.lower())
+        table_name = TABLE_NAMES.get(sheet_name, sheet_name.lower())
         st.session_state[f"df_{sheet_name.lower()}"] = client.get_table(table_name)
     st.cache_data.clear()
 
 
 def update_cell_by_id(client, sheet_name, id_to_find, column_name, new_value):
     """Actualiza una celda específica buscando por ID. Compatible con google_sheets_client."""
-    table_name = SHEET_TO_TABLE_MAP.get(sheet_name, sheet_name.lower())
+    table_name = TABLE_NAMES.get(sheet_name, sheet_name.lower())
     return client.update_cell_by_id(table_name, id_to_find, column_name, new_value)
 
 

@@ -7,8 +7,8 @@ import os
 
 # Mapeo de roles a permisos
 ROLES_PERMISOS = {
-    'admin': ['inicio', 'tareas', 'vacaciones', 'compensados', 'eventos', 'notas', 'calendario', 'horarios', 'utilidades'],
-    'empleado': ['inicio', 'tareas', 'vacaciones'],
+    'admin': ['inicio', 'vacaciones', 'compensados', 'calendario', 'horarios', 'utilidades'],
+    'empleado': ['inicio', 'vacaciones'],
     'secretaria': ['inicio', 'vacaciones', 'compensados', 'horarios'],
     'invitado': ['inicio']
 }
@@ -16,26 +16,20 @@ ROLES_PERMISOS = {
 # Mapeo de páginas a sus permisos requeridos
 PAGE_PERMISSIONS = {
     '00_Inicio': 'inicio',
-    '01_Tareas': 'tareas',
     '02_Vacaciones': 'vacaciones',
     '03_Compensados': 'compensados',
-    '04_Notas': 'notas',
     '06_Calendario': 'calendario',
     '07_Horarios': 'horarios',
-    '08_Viajes': 'horarios',
     '10_Utilidades_Carga_y_Merge': 'utilidades'
 }
 
 # Mapeo de páginas a sus emojis para el sidebar
 PAGE_ICONS = {
     '00_Inicio': '🏠',
-    '01_Tareas': '✅',
     '02_Vacaciones': '📅',
     '03_Compensados': '⏱️',
-    '04_Notas': '📝',
     '06_Calendario': '📆',
     '07_Horarios': '👥',
-    '08_Viajes': '🚗',
     '10_Utilidades_Carga_y_Merge': '🧰'
 }
 

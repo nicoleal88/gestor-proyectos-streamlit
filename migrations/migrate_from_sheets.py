@@ -21,31 +21,17 @@ from database_schema import SCHEMA
 
 # Hojas a migrar (ordenadas por prioridad)
 SHEETS_TO_MIGRATE = [
-    "Tareas",
     "Vacaciones", 
     "Compensados",
-    "Notas",
     "Personal",
-    "Eventos",
-    "Vehiculos",
-    "Viajes",
-    "ViajesUpdates",
-    "Destinos",
     "Feriados_Manuales",
 ]
 
 # Mapeo de nombres de hoja Google Sheets a tabla SQLite
 SHEET_TO_TABLE_MAP = {
-    "Tareas": "tareas",
     "Vacaciones": "vacaciones",
     "Compensados": "compensados",
-    "Notas": "notas",
     "Personal": "personal",
-    "Eventos": "eventos",
-    "Vehiculos": "vehiculos",
-    "Viajes": "viajes",
-    "ViajesUpdates": "viajes_updates",
-    "Destinos": "destinos",
     "Feriados_Manuales": "feriados",
 }
 
