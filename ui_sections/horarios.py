@@ -1650,7 +1650,7 @@ def seccion_horarios(client, personal_list):
                     opacity=0.7
                 )
                 
-                st.plotly_chart(fig_historial, use_container_width=True)
+                st.plotly_chart(fig_historial, width='stretch')
                                # --- Diagrama de intervalos de trabajo (Timeline diario) - RELOJ y COMPENSADOS ---
                 df_reloj_raw = df_filtrado[df_filtrado['tipo'] == 'RELOJ'].copy()
                 df_reloj_raw['fecha_only'] = df_reloj_raw['fecha_hora'].dt.date
@@ -1782,7 +1782,7 @@ def seccion_horarios(client, personal_list):
                     width=0.4 # Ajustar el ancho de la barra
                 )
                 
-                st.plotly_chart(fig_timeline, use_container_width=True)
+                st.plotly_chart(fig_timeline, width='stretch')
                 
                 # --- Gráfico de diferencias ---
                 st.subheader("Diferencia diaria (LIBRO - RELOJ)")
@@ -2015,7 +2015,7 @@ def seccion_horarios(client, personal_list):
                             annotation_text="8 hs ideales",
                             annotation_position="top right"
                         )
-                        st.plotly_chart(fig_box_libro, use_container_width=True)
+                        st.plotly_chart(fig_box_libro, width='stretch')
                     else:
                         st.warning("No hay datos de LIBRO para mostrar")
                 
@@ -2047,7 +2047,7 @@ def seccion_horarios(client, personal_list):
                             annotation_text="8 hs ideales",
                             annotation_position="top right"
                         )
-                        st.plotly_chart(fig_box_reloj, use_container_width=True)
+                        st.plotly_chart(fig_box_reloj, width='stretch')
                     else:
                         st.warning("No hay datos de RELOJ para mostrar")
             else:

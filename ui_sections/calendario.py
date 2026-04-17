@@ -342,7 +342,7 @@ def seccion_feriados_manuales(client):
             with col2:
                 motivo = st.text_input("Motivo", placeholder="Ej: Feriado empresa")
             
-            submit = st.form_submit_button("➕ Agregar Feriado", use_container_width=True)
+            submit = st.form_submit_button("➕ Agregar Feriado", width='stretch')
             
             if submit:
                 if not motivo:
