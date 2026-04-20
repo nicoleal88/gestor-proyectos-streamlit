@@ -150,7 +150,7 @@ def seccion_compensados(client, personal_list):
         with st.form("compensados_form", clear_on_submit=True):
             nombre = st.selectbox("Apellido, Nombres", options=["Seleccione persona..."] + personal_list)
             fecha_solicitud = st.date_input("Fecha Solicitud", value=datetime.now(), format="DD/MM/YYYY")
-            tipo = st.selectbox("Tipo", options=["Compensatorio", "Certificado médico", "Permiso gremial", "Estudios", "Otro"])
+            tipo = st.selectbox("Tipo", options=["Compensatorio", "Certificado médico", "Permiso gremial", "Estudios", "Franco compensatorio por feriado trabajado", "Otro"])
 
             # Tomamos los valores seteados fuera del form
             desde_fecha = st.session_state.get("comp_desde_fecha")
