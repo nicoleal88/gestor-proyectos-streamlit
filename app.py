@@ -152,6 +152,10 @@ def main():
             st.button("Cerrar sesión", on_click=st.logout)
             st.markdown("---")
 
+        # 1.5. Backup status indicator
+        from components.backup_status import render_backup_status
+        render_backup_status()
+
         # 2. Navegación (el menú aparecerá debajo de lo anterior)
         selected_page = st.navigation(pages)
 
