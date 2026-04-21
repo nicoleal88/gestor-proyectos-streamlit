@@ -37,16 +37,18 @@ def render_backup_status():
         icon = "🟢"  # green circle
         if last_success:
             dt = datetime.fromisoformat(last_success)
-            time_str = dt.strftime("%H:%M")
-            message = f"Backup OK - Último: {time_str}"
+            # Format: YYYY-MM-DD HH:MM UTC
+            datetime_str = dt.strftime("%Y-%m-%d %H:%M UTC")
+            message = f"Backup OK - Último: {datetime_str}"
         else:
             message = "Backup OK"
     elif status == "error":
         icon = "🔴"  # red circle
         if last_error:
             dt = datetime.fromisoformat(last_error)
-            time_str = dt.strftime("%H:%M")
-            message = f"Backup FALLIDO: {time_str}"
+            # Format: YYYY-MM-DD HH:MM UTC
+            datetime_str = dt.strftime("%Y-%m-%d %H:%M UTC")
+            message = f"Backup FALLIDO: {datetime_str}"
         else:
             message = "Backup FALLIDO"
     else:  # never_run or other
