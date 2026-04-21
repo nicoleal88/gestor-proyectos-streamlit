@@ -7,6 +7,7 @@ data/*.db
 
 # Virtual environment
 /venv
+.env
 
 ui_sections/__pycache__/*
 __pycache__/*
@@ -33,3 +34,6 @@ tests/.pytest_cache/
 
 # Backup sections (disabled features)
 backup_disabled_sections/
+backups/backup_status.json
+backups/backup.log
+components/__pycache__/backup_status.cpython-312.pyc
